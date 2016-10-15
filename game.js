@@ -12,6 +12,8 @@ define('game', [
     // - Classer behöver TYPES som input, helt redundant
 
     // 144 or 60
+    var DEBUG_WRITE_BUTTONS = false;
+
     const FPS = 144;
 
     let gameObjects = [];
@@ -23,6 +25,13 @@ define('game', [
 
     var canvas = document.getElementById('canvas');
     var context = canvas.getContext('2d');
+
+    function debugWriteButtons(pad) {
+        if (!DEBUG_WRITE_BUTTONS) return;
+        _.each(pad && pad.buttons, function(button, idx) {
+            if (button.pressed) console.log(idx + " pressed");
+        })
+    }
     
     class GameObject {
         constructor(pos, type) {
@@ -97,6 +106,13 @@ define('game', [
         }
     }
 
+    class Mine extends GameObject {
+        constructor(pos, type) {
+            super(pos, type);
+            this.color = "#8df9ff";
+        }
+    }
+
     class Mothership extends GameObject {
         constructor(pos, type) {
             super(pos, type);
@@ -116,8 +132,21 @@ define('game', [
         tick() {
             if (this.disabled) return; 
             var pad = userInput.readInput()[this.id];
+            debugWriteButtons(pad);
             if (!(pad && pad.axes && pad.axes[2] && pad.axes[3])) return;
 
+            if (pad.buttons[5].pressed) {
+                if (pad.axes[2] < -0.8) {
+                    console.log('david west');
+                } else if (pad.axes[2] > 0.8) {
+                    console.log('east');
+                }
+                if (pad.axes[3] < -0.8) {
+                    console.log('north');
+                } else if (pad.axes[3] > 0.8) {
+                    console.log('south');
+                }
+            }
             var newPos = {
                 x: this.pos.x + pad.axes[0],    
                 y: this.pos.y + pad.axes[1],    
@@ -212,6 +241,12 @@ define('game', [
             var mothership = (obj1.type === map.types.MOTHERSHIP) ? obj1 : obj2;
             mothership.hp = mothership.hp - 0.01;
         }
+        if (typeCheck(obj1, obj2, map.types.GRUNT, map.types.MINE)) {
+            var mine = (obj1.type === map.types.MINE) ? obj1 : obj2;
+            var grunt = (obj1.type === map.types.GRUNT) ? obj1 : obj2;
+            mine.markedForRemoval = true;
+            grunt.markedForRemoval = true;
+        }
         if (typeCheck(obj1, obj2, map.types.GRUNT, map.types.MOTHERSHIP)) {
             var mothership = (obj1.type === map.types.MOTHERSHIP) ? obj1 : obj2;
             mothership.hp = mothership.hp - 0.03;
@@ -281,6 +316,9 @@ define('game', [
                     break;
                     case map.types.PART:
                         gameObjects.push(new Part({x: colIdx * GRID_SIZE, y: rowIdx * GRID_SIZE}, map.types.PART));
+                    break;
+                    case map.types.MINE:
+                        gameObjects.push(new Mine({x: colIdx * GRID_SIZE, y: rowIdx * GRID_SIZE}, map.types.MINE));
                     break;
                 }   
             });
