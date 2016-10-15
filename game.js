@@ -106,6 +106,20 @@ define('game', [
         }
     }
 
+    class Punch extends GameObject {
+        constructor(pos, type) {
+            super(pos, type);
+            this.color = "#9c953e";
+            this.duration = 10;
+        }
+        tick() {
+            this.duration--;
+            if (this.duration <= 0) {
+                this.markedForRemoval = true;
+            }
+        }
+    }
+
     class Mine extends GameObject {
         constructor(pos, type) {
             super(pos, type);
@@ -126,32 +140,118 @@ define('game', [
             super(pos, type);
             this.id = id;
             this.color = "purple";
-            this.debree = 0;
+            this.debree = 1;
             this.disabled = false;
+            this.cooldown = 0;
         }
         tick() {
-            if (this.disabled) return; 
+            if (this.disabled) return;
+            this.cooldown--;
             var pad = userInput.readInput()[this.id];
             debugWriteButtons(pad);
             if (!(pad && pad.axes && pad.axes[2] && pad.axes[3])) return;
 
-            if (pad.buttons[5].pressed) {
-                if (pad.axes[2] < -0.8) {
-                    console.log('david west');
-                } else if (pad.axes[2] > 0.8) {
-                    console.log('east');
-                }
-                if (pad.axes[3] < -0.8) {
-                    console.log('north');
-                } else if (pad.axes[3] > 0.8) {
-                    console.log('south');
-                }
-            }
+            this.checkPunch(pad);
+            this.checkPlaceMine(pad);
+
             var newPos = {
                 x: this.pos.x + pad.axes[0],    
                 y: this.pos.y + pad.axes[1],    
             }
             attemptMove(this, newPos);
+        }
+        checkPlaceMine(pad) {
+            if (pad.buttons[4].pressed && this.cooldown <= 0 && this.debree > 0) {
+                var modifier = { x: 0, y: 0 };
+                if (pad.axes[2] < -0.8) {
+                    modifier = {
+                        x: -GRID_SIZE*2,
+                        y: 0
+                    }
+                } else if (pad.axes[2] > 0.8) {
+                    modifier = {
+                        x: +GRID_SIZE*2,
+                        y: 0
+                    }
+                }
+                if (pad.axes[3] < -0.8) {
+                    modifier = {
+                        x: 0,
+                        y: -GRID_SIZE*2
+                    }
+                } else if (pad.axes[3] > 0.8) {
+                    modifier = {
+                        x: 0,
+                        y: +GRID_SIZE*2
+                    }
+                }
+                if (modifier.x === 0 && modifier.y === 0) return;
+
+                this.cooldown = 70;
+
+                var placementPos = _.clone(this.pos);
+                placementPos.x = placementPos.x + modifier.x;
+                placementPos.y = placementPos.y + modifier.y;
+                gameObjects.push(new Mine(placementPos, map.types.MINE));
+
+                this.debree = this.debree - 1;
+            }
+        }
+        checkPunch(pad) {
+            if (pad.buttons[5].pressed && this.cooldown <= 0) {
+                var modifier1 = { x: 0, y: 0 };
+                var modifier2 = { x: 0, y: 0 };
+                if (pad.axes[2] < -0.8) {
+                    modifier1 = {
+                        x: -GRID_SIZE,
+                        y: 0
+                    }
+                    modifier2 = {
+                        x: -GRID_SIZE*2,
+                        y: 0
+                    }
+                } else if (pad.axes[2] > 0.8) {
+                    modifier1 = {
+                        x: +GRID_SIZE,
+                        y: 0
+                    }
+                    modifier2 = {
+                        x: +GRID_SIZE*2,
+                        y: 0
+                    }
+                }
+                if (pad.axes[3] < -0.8) {
+                    modifier1 = {
+                        x: 0,
+                        y: -GRID_SIZE
+                    }
+                    modifier2 = {
+                        x: 0,
+                        y: -GRID_SIZE*2
+                    }
+                } else if (pad.axes[3] > 0.8) {
+                    modifier1 = {
+                        x: 0,
+                        y: +GRID_SIZE
+                    }
+                    modifier2 = {
+                        x: 0,
+                        y: +GRID_SIZE*2
+                    }
+                }
+                if (modifier1.x === 0 && modifier1.y === 0 && modifier2.x === 0 && modifier2.y === 0) return;
+
+                this.cooldown = 70;
+
+                var firstPos = _.clone(this.pos);
+                firstPos.x = firstPos.x + modifier1.x;
+                firstPos.y = firstPos.y + modifier1.y;
+                gameObjects.push(new Punch(firstPos, map.types.PUNCH));
+                var secondPos = _.clone(this.pos);
+                secondPos.x = secondPos.x + modifier2.x;
+                secondPos.y = secondPos.y + modifier2.y;
+                gameObjects.push(new Punch(secondPos, map.types.PUNCH));
+            }
         }
         draw() {
             context.fillStyle = this.color;
@@ -163,6 +263,8 @@ define('game', [
                 context.stroke();
             } else {
                 super.draw();
+                context.fillStyle = "white";
+                context.fillText(this.debree, this.pos.x + 3, this.pos.y + 18)
             }
         }
     }
@@ -222,6 +324,17 @@ define('game', [
         return (obj1.type === type1 && obj2.type === type2 || obj2.type === type1 && obj1.type === type2)
     }
 
+    function collisionFilterIgnored(obj1, obj2) {
+        //Every pair here ignores collisions
+        var table = [
+            [map.types.FLYER, map.types.MINE]
+        ]
+        return !!_.find(table, function(filter) {
+            return obj1 === filter[0] && obj2 === filter[1] || obj2 === filter[0] && obj1 === filter[1];
+        });
+    }
+    window.kurt = collisionFilterIgnored;
+
     function collision(obj1, obj2) {
 
         if (obj1.type === map.types.PLAYER && obj2.type === map.types.PLAYER) {
@@ -230,12 +343,19 @@ define('game', [
         }
         if (typeCheck(obj1, obj2, map.types.PLAYER, map.types.FLYER)) {
             var player = (obj1.type === map.types.PLAYER) ? obj1 : obj2;
+            player.disabled = true;
+        }
+        if (typeCheck(obj1, obj2, map.types.PLAYER, map.types.MINE)) {
+            var player = (obj1.type === map.types.PLAYER) ? obj1 : obj2;
+            player.disabled = true;
+        }
+        if (typeCheck(obj1, obj2, map.types.PLAYER, map.types.GRUNT)) {
+            var player = (obj1.type === map.types.PLAYER) ? obj1 : obj2;
+            player.disabled = true;
+        }
+        if (typeCheck(obj1, obj2, map.types.PUNCH, map.types.FLYER)) {
             var flyer = (obj1.type === map.types.FLYER) ? obj1 : obj2;
-            if (player.id === 0) {
-                flyer.markedForRemoval = true;
-            } else {
-                player.disabled = true;
-            }
+            flyer.markedForRemoval = true;
         }
         if (typeCheck(obj1, obj2, map.types.FLYER, map.types.MOTHERSHIP)) {
             var mothership = (obj1.type === map.types.MOTHERSHIP) ? obj1 : obj2;
@@ -268,7 +388,7 @@ define('game', [
                 (gameObject.pos.y > obj.pos.y + GRID_SIZE) || (gameObject.pos.y + GRID_SIZE < obj.pos.y)
             );
             if (!legal) collision(gameObject, obj);
-            return !legal;
+            return !legal && collisionFilterIgnored(gameObject, obj);
         });
         var resultY = _.find(gameObjects, function(obj) {
             if (gameObject === obj) return false;
@@ -277,7 +397,7 @@ define('game', [
                 (newPos.y > obj.pos.y + GRID_SIZE) || (newPos.y + GRID_SIZE < obj.pos.y)
             );
             if (!legal) collision(gameObject, obj);
-            return !legal;
+            return !legal && collisionFilterIgnored(gameObject, obj);
         });
         (resultX) ? null : gameObject.pos.x = newPos.x;
         (resultY) ? null : gameObject.pos.y = newPos.y;
@@ -327,8 +447,8 @@ define('game', [
 
     function allEnemiesOnMap() {
         return _.filter(gameObjects, function(item) {
-            return item.type === map.types.FLYER;
-        })
+            return item.type === map.types.FLYER || item.type === map.types.GRUNT;
+        });
     }
 
     function endConditions() {

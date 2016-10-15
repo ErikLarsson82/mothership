@@ -16,6 +16,7 @@ define('map', [], function() {
     var GRUN = "Grunt";
     var SHIE = "Shieldman";
     var MINE = "Mine";
+    var PUNC = "Punch";
 
     var types = { 
         WALL: WALL,
@@ -33,7 +34,8 @@ define('map', [], function() {
         FLYER: FLYE,
         GRUNT: GRUN,
         SHIELDMAN: SHIE,
-        MINE: MINE
+        MINE: MINE,
+        PUNCH: PUNC
     };
     return {
         types: types,
