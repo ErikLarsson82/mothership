@@ -94,8 +94,10 @@ define('game', [
             this.id = id;
             this.color = "purple";
             this.debree = 0;
+            this.disabled = false;
         }
         tick() {
+            if (this.disabled) return; 
             var pad = userInput.readInput()[this.id];
             if (!(pad && pad.axes && pad.axes[2] && pad.axes[3])) return;
 
@@ -104,6 +106,18 @@ define('game', [
                 y: this.pos.y + pad.axes[1],    
             }
             attemptMove(this, newPos);
+        }
+        draw() {
+            context.fillStyle = this.color;
+            if (this.disabled) {
+                context.beginPath();
+                context.lineWidth = "2";
+                context.strokeStyle = this.color;
+                context.rect(this.pos.x, this.pos.y, GRID_SIZE, GRID_SIZE);
+                context.stroke();
+            } else {
+                super.draw();
+            }
         }
     }
 
@@ -157,10 +171,14 @@ define('game', [
 
     function collision(obj1, obj2) {
 
+        if (obj1.type === map.types.PLAYER && obj2.type === map.types.PLAYER) {
+            obj1.disabled = false;
+            obj2.disabled = false;
+        }
         if (typeCheck(obj1, obj2, map.types.PLAYER, map.types.FLYER)) {
             var player = (obj1.type === map.types.PLAYER) ? obj1 : obj2;
             var flyer = (obj1.type === map.types.FLYER) ? obj1 : obj2;
-            if (player.id === 0) {
+            if (player.id === 1) {
                 flyer.markedForRemoval = true;
             } else {
                 player.disabled = true;
@@ -261,6 +279,8 @@ define('game', [
             waveController = new WaveController(map.waves);
 
             context.font="20px Verdana";
+
+            findGameObjWithIndex(map.types.PLAYER, 1).disabled = true;
         },
         tick: function() {
 
