@@ -178,7 +178,7 @@ define('game', [
         if (typeCheck(obj1, obj2, map.types.PLAYER, map.types.FLYER)) {
             var player = (obj1.type === map.types.PLAYER) ? obj1 : obj2;
             var flyer = (obj1.type === map.types.FLYER) ? obj1 : obj2;
-            if (player.id === 1) {
+            if (player.id === 0) {
                 flyer.markedForRemoval = true;
             } else {
                 player.disabled = true;
@@ -259,15 +259,28 @@ define('game', [
         });
     }
 
+    function allEnemiesOnMap() {
+        return _.filter(gameObjects, function(item) {
+            return item.type === map.types.FLYER;
+        })
+    }
+
     function endConditions() {
         //waveController is done and no more enemies -> Map complete! -> 1
         //all players on the ground -> Game over -> 2
         //mothership destroyed -> Game over -> 2
         //else -> false
-        if (waveController.waves.length === 0 && false) {
+        if (waveController.waves.length === 0 && allEnemiesOnMap().length === 0) {
             return 1;
         }
         if (findGameObj(map.types.MOTHERSHIP).hp <= 0) {
+            return 2;
+        }
+        if (
+            findGameObjWithIndex(map.types.PLAYER, 0).disabled &&
+            findGameObjWithIndex(map.types.PLAYER, 1).disabled &&
+            findGameObjWithIndex(map.types.PLAYER, 2).disabled
+        ) {
             return 2;
         }
         return false;
@@ -281,6 +294,7 @@ define('game', [
             context.font="20px Verdana";
 
             findGameObjWithIndex(map.types.PLAYER, 1).disabled = true;
+            findGameObjWithIndex(map.types.PLAYER, 2).disabled = true;
         },
         tick: function() {
 
