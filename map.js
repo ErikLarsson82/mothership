@@ -79,22 +79,28 @@ define('map', [], function() {
             [WALL,/**/,/**/,/**/,/**/,WALL,/**/,/**/,/**/,/**/,/**/,/**/,/**/,/**/,/**/,/**/,/**/,WALL,PART,/**/,/**/,/**/,/**/,/**/,SPW2,/**/,/**/,/**/,/**/,/**/,/**/,/**/,/**/,/**/,/**/,/**/,WALL,/**/,/**/,/**/,/**/,/**/,/**/,/**/,/**/,/**/,/**/,/**/,/**/,/**/,WALL],
             [WALL,WALL,WALL,WALL,WALL,WALL,WALL,WALL,WALL,WALL,WALL,WALL,WALL,WALL,WALL,WALL,WALL,WALL,WALL,WALL,WALL,WALL,WALL,WALL,WALL,WALL,WALL,WALL,WALL,WALL,WALL,WALL,WALL,WALL,WALL,WALL,WALL,WALL,WALL,WALL,WALL,WALL,WALL,WALL,WALL,WALL,WALL,WALL,WALL,WALL,WALL],
         ],
-        /* MS -> Human readable
-            144 -> 1 sek
-            8640 -> 1 min
-        */
         waves: [
-            { spawnIdx: 0, type: types.GRUNT },
+            /*{ spawnIdx: 0, type: types.GRUNT },
             { duration: 2 },
             { spawnIdx: 0, type: types.FLYER },
             { duration: 1 },
             { spawnIdx: 2, type: types.FLYER },
             { duration: 10 },
             { spawnIdx: 1, type: types.GRUNT },
+            { spawnIdx: 2, type: types.GRUNT },*/
+            { duration: 5 },
+            { spawnIdx: 0, type: types.FLYER },
+            { spawnIdx: 1, type: types.FLYER },
+            { spawnIdx: 2, type: types.FLYER },
+            { duration: 2 },
+            { spawnIdx: 0, type: types.FLYER },
+            { spawnIdx: 1, type: types.FLYER },
+            { spawnIdx: 2, type: types.FLYER },
+            { duration: 2 },
+            { spawnIdx: 0, type: types.GRUNT },
+            { spawnIdx: 1, type: types.GRUNT },
             { spawnIdx: 2, type: types.GRUNT },
         ]
     }
     
-})
-/*
-kurt = */
+});

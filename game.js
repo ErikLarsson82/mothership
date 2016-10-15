@@ -13,12 +13,14 @@ define('game', [
 
     // 144 or 60
     var DEBUG_WRITE_BUTTONS = false;
+    var FULLSCREEN = false;
 
     const FPS = 144;
 
     let gameObjects = [];
     let spawnObjects = [];
     let waveController = null;
+    let screenShaker = null;
     window.gameObjects = gameObjects;
 
     const GRID_SIZE = 20;
@@ -307,6 +309,74 @@ define('game', [
         }
     }
 
+    class ScreenShaker {
+        constructor() {
+            this.idx = 0;
+            var shakeAmount = 7;
+            var shakeAmount2 = 4;
+            this.shakeArray = [
+                [0,0],
+                [shakeAmount,0],
+                [shakeAmount,shakeAmount2],
+                [shakeAmount,shakeAmount2],
+                [shakeAmount,shakeAmount2],
+                [shakeAmount,shakeAmount2],
+                [shakeAmount,0],
+                [0,-shakeAmount2],
+                [0,-shakeAmount2],
+                [0,-shakeAmount2],
+                [0,-shakeAmount2],
+                [0,-shakeAmount2],
+                [0,-shakeAmount2],
+                [-shakeAmount,0],
+                [-shakeAmount,0],
+                [-shakeAmount,0],
+                [-shakeAmount,0],
+                [-shakeAmount,0],
+                [-shakeAmount,0],
+                [-shakeAmount,0],
+                [-shakeAmount,0],
+                [0,0],
+                [0,0],
+                [0,0],
+                [0,0],
+                [0,shakeAmount2],
+                [0,shakeAmount2],
+                [0,shakeAmount2],
+                [shakeAmount,shakeAmount2],
+                [shakeAmount,shakeAmount2],
+                [shakeAmount,shakeAmount2],
+                [shakeAmount,0],
+                [shakeAmount,0],
+                [shakeAmount,0],
+                [shakeAmount,0],
+                [0,0],
+            ];
+            window.addEventListener("keydown", function(e) {
+                if (e.keyCode === 67) {
+                    this.shake();
+                }
+            }.bind(this))
+        }
+        shake() {
+            if (this.idx === 0) {
+                this.idx = this.shakeArray.length-1;
+            }
+        }
+        render() {
+            if (this.idx > 0) {
+                this.idx = this.idx - 1;
+                context.save();
+                context.translate(this.shakeArray[this.idx][0], this.shakeArray[this.idx][1]);
+            }
+        }
+        restore() {
+            if (this.idx > 0) {
+                context.restore();
+            }
+        }
+    }
+
     function findGameObj(type) {
         return _.find(gameObjects, function(item) {
             return item.type === type;
@@ -344,7 +414,9 @@ define('game', [
         }
         if (typeCheck(obj1, obj2, map.types.PLAYER, map.types.MINE)) {
             var player = (obj1.type === map.types.PLAYER) ? obj1 : obj2;
+            var mine = (obj1.type === map.types.MINE) ? obj1 : obj2;
             player.disabled = true;
+            mine.markedForRemoval = true;
         }
         if (typeCheck(obj1, obj2, map.types.PLAYER, map.types.GRUNT)) {
             var player = (obj1.type === map.types.PLAYER) ? obj1 : obj2;
@@ -357,6 +429,7 @@ define('game', [
         if (typeCheck(obj1, obj2, map.types.FLYER, map.types.MOTHERSHIP)) {
             var mothership = (obj1.type === map.types.MOTHERSHIP) ? obj1 : obj2;
             mothership.hp = mothership.hp - 0.01;
+            screenShaker.shake();
         }
         if (typeCheck(obj1, obj2, map.types.GRUNT, map.types.MINE)) {
             var mine = (obj1.type === map.types.MINE) ? obj1 : obj2;
@@ -367,6 +440,7 @@ define('game', [
         if (typeCheck(obj1, obj2, map.types.GRUNT, map.types.MOTHERSHIP)) {
             var mothership = (obj1.type === map.types.MOTHERSHIP) ? obj1 : obj2;
             mothership.hp = mothership.hp - 0.03;
+            screenShaker.shake();
         }
         if (typeCheck(obj1, obj2, map.types.PLAYER, map.types.DEBREE)) {
             var player = (obj1.type === map.types.PLAYER) ? obj1 : obj2;
@@ -449,10 +523,6 @@ define('game', [
     }
 
     function endConditions() {
-        //waveController is done and no more enemies -> Map complete! -> 1
-        //all players on the ground -> Game over -> 2
-        //mothership destroyed -> Game over -> 2
-        //else -> false
         if (waveController.waves.length === 0 && allEnemiesOnMap().length === 0) {
             return 1;
         }
@@ -473,11 +543,17 @@ define('game', [
         init: function() {
             generateMap();
             waveController = new WaveController(map.waves);
+            screenShaker = new ScreenShaker();
 
             context.font="20px Verdana";
 
             findGameObjWithIndex(map.types.PLAYER, 1).disabled = true;
             findGameObjWithIndex(map.types.PLAYER, 2).disabled = true;
+
+            if (FULLSCREEN) {
+                canvas.style.height = "100%";
+                canvas.style.width = "100%";
+            }
         },
         tick: function() {
 
@@ -516,6 +592,8 @@ define('game', [
             context.fillStyle = "#d0d0d0"
             context.fillRect(0, 0, 1024, 768)
 
+            screenShaker.render();
+
             _.each(gameObjects, function(gameObject) {
                 gameObject.draw();
             });
@@ -524,6 +602,8 @@ define('game', [
             context.fillStyle = "white"
             var mothership = findGameObj(map.types.MOTHERSHIP);
             context.fillText('Mothership HP: ' + mothership.hp.toFixed(0),400,16);
+
+            screenShaker.restore();
         }
     }
 });
