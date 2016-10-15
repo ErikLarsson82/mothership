@@ -65,6 +65,23 @@ define('game', [
         }
     }
 
+    class Grunt extends GameObject {
+        constructor(pos, type) {
+            super(pos, type);
+            this.color = "#2f2f2f";
+        }
+        tick() {
+            var motherPos = findGameObj(map.types.MOTHERSHIP).pos;
+            var x = (motherPos.x > this.pos.x) ? this.pos.x + 0.1 : this.pos.x - 0.1;
+            var y = (motherPos.y > this.pos.y) ? this.pos.y + 0.1 : this.pos.y - 0.1;
+            var newPos = {
+                x: x,
+                y: y
+            }
+            attemptMove(this, newPos);   
+        }
+    }
+
     class Spawn extends GameObject {
         constructor(pos, type, id) {
             super(pos, type);
@@ -146,6 +163,13 @@ define('game', [
                             targetPos.y = (motherPos.y > targetPos.y) ? targetPos.y + GRID_SIZE : targetPos.y - GRID_SIZE;
                             gameObjects.push(new Flyer(targetPos, map.types.FLYER));
                         break;
+                        case map.types.GRUNT:
+                            var targetPos = _.clone(findGameObjWithIndex(map.types.SPAWN, blueprint.spawnIdx).pos);
+                            var motherPos = findGameObj(map.types.MOTHERSHIP).pos;
+                            targetPos.x = (motherPos.x > targetPos.x) ? targetPos.x + GRID_SIZE : targetPos.x - GRID_SIZE;
+                            targetPos.y = (motherPos.y > targetPos.y) ? targetPos.y + GRID_SIZE : targetPos.y - GRID_SIZE;
+                            gameObjects.push(new Grunt(targetPos, map.types.GRUNT));
+                        break;
                     }
                 }
             }
@@ -187,6 +211,10 @@ define('game', [
         if (typeCheck(obj1, obj2, map.types.FLYER, map.types.MOTHERSHIP)) {
             var mothership = (obj1.type === map.types.MOTHERSHIP) ? obj1 : obj2;
             mothership.hp = mothership.hp - 0.01;
+        }
+        if (typeCheck(obj1, obj2, map.types.GRUNT, map.types.MOTHERSHIP)) {
+            var mothership = (obj1.type === map.types.MOTHERSHIP) ? obj1 : obj2;
+            mothership.hp = mothership.hp - 0.03;
         }
         if (typeCheck(obj1, obj2, map.types.PLAYER, map.types.DEBREE)) {
             var player = (obj1.type === map.types.PLAYER) ? obj1 : obj2;
