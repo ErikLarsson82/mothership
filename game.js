@@ -317,9 +317,7 @@ define('game', [
             return item.type === type && item.id === idx;
         })
     }
-    window.findGameObj = findGameObj;
-    window.findGameObjWithIndex = findGameObjWithIndex;
-
+    
     function typeCheck(obj1, obj2, type1, type2) {
         return (obj1.type === type1 && obj2.type === type2 || obj2.type === type1 && obj1.type === type2)
     }
@@ -333,8 +331,7 @@ define('game', [
             return obj1 === filter[0] && obj2 === filter[1] || obj2 === filter[0] && obj1 === filter[1];
         });
     }
-    window.kurt = collisionFilterIgnored;
-
+    
     function collision(obj1, obj2) {
 
         if (obj1.type === map.types.PLAYER && obj2.type === map.types.PLAYER) {
@@ -380,7 +377,7 @@ define('game', [
     }
 
     function attemptMove(gameObject, newPos) {
-        var resultX = _.find(gameObjects, function(obj) {
+        var somethingBlockedX = _.find(gameObjects, function(obj) {
             if (gameObject === obj) return false;
             if (!obj.pos) debugger;
             var legal = (
@@ -388,19 +385,19 @@ define('game', [
                 (gameObject.pos.y > obj.pos.y + GRID_SIZE) || (gameObject.pos.y + GRID_SIZE < obj.pos.y)
             );
             if (!legal) collision(gameObject, obj);
-            return !legal && collisionFilterIgnored(gameObject, obj);
+            return !legal && !collisionFilterIgnored(gameObject.type, obj.type);
         });
-        var resultY = _.find(gameObjects, function(obj) {
+        var somethingBlockedY = _.find(gameObjects, function(obj) {
             if (gameObject === obj) return false;
             var legal = (
                 (gameObject.pos.x > obj.pos.x + GRID_SIZE) || (gameObject.pos.x + GRID_SIZE < obj.pos.x) ||
                 (newPos.y > obj.pos.y + GRID_SIZE) || (newPos.y + GRID_SIZE < obj.pos.y)
             );
             if (!legal) collision(gameObject, obj);
-            return !legal && collisionFilterIgnored(gameObject, obj);
+            return !legal && !collisionFilterIgnored(gameObject.type, obj.type);
         });
-        (resultX) ? null : gameObject.pos.x = newPos.x;
-        (resultY) ? null : gameObject.pos.y = newPos.y;
+        (somethingBlockedX) ? null : gameObject.pos.x = newPos.x;
+        (somethingBlockedY) ? null : gameObject.pos.y = newPos.y;
     }
 
     function generateMap() {
