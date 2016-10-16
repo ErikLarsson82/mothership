@@ -122,10 +122,54 @@ define('game', [
         }
     }
 
+    class Shot extends GameObject {
+        constructor(pos, type) {
+            super(pos, type);
+            this.color = "#6b0b00";
+            this.duration = 10;
+        }
+        tick() {
+            super.tick();
+            this.duration--;
+            if (this.duration <= 0) {
+                this.markedForRemoval = true;
+            }
+            attemptMove(this, this.pos);
+        }
+    }
+
     class Mine extends GameObject {
         constructor(pos, type) {
             super(pos, type);
             this.color = "#8df9ff";
+        }
+        tick() {
+            super.tick();
+            attemptMove(this, this.pos);
+        }
+    }
+
+    class Turret extends GameObject {
+        constructor(pos, type) {
+            super(pos, type);
+            this.color = "#fde0ff";
+            this.scanDelayMax = 300;
+            this.scanDelay = this.scanDelayMax;
+        }
+        tick() {
+            super.tick();
+            this.scanDelay--;
+            if (this.scanDelay <= 0) {
+                this.scanDelay = this.scanDelayMax;
+                _.each([-GRID_SIZE*2,0,+GRID_SIZE*2], function(x) {
+                    _.each([-GRID_SIZE*2,0,+GRID_SIZE*2], function(y) {
+                        var pos = _.clone(this.pos);
+                        pos.x = pos.x + x;
+                        pos.y = pos.y + y;
+                        gameObjects.push(new Shot(pos, map.types.SHOT));
+                    }.bind(this));
+                }.bind(this));
+            }
         }
     }
 
@@ -155,12 +199,50 @@ define('game', [
 
             this.checkPunch(pad);
             this.checkPlaceMine(pad);
+            this.checkPlaceTurret(pad);
 
             var newPos = {
                 x: this.pos.x + pad.axes[0],    
                 y: this.pos.y + pad.axes[1],    
             }
             attemptMove(this, newPos);
+        }
+        checkPlaceTurret(pad) {
+            if (pad.buttons[6].pressed && this.cooldown <= 0 && this.debree > 0) {
+                var modifier = { x: 0, y: 0 };
+                if (pad.axes[2] < -0.8) {
+                    modifier = {
+                        x: -GRID_SIZE*2,
+                        y: 0
+                    }
+                } else if (pad.axes[2] > 0.8) {
+                    modifier = {
+                        x: +GRID_SIZE*2,
+                        y: 0
+                    }
+                }
+                if (pad.axes[3] < -0.8) {
+                    modifier = {
+                        x: 0,
+                        y: -GRID_SIZE*2
+                    }
+                } else if (pad.axes[3] > 0.8) {
+                    modifier = {
+                        x: 0,
+                        y: +GRID_SIZE*2
+                    }
+                }
+                if (modifier.x === 0 && modifier.y === 0) return;
+
+                this.cooldown = 70;
+
+                var placementPos = _.clone(this.pos);
+                placementPos.x = placementPos.x + modifier.x;
+                placementPos.y = placementPos.y + modifier.y;
+                gameObjects.push(new Turret(placementPos, map.types.TURRET));
+
+                this.debree = this.debree - 1;
+            }
         }
         checkPlaceMine(pad) {
             if (pad.buttons[4].pressed && this.cooldown <= 0 && this.debree > 0) {
@@ -408,6 +490,26 @@ define('game', [
             obj1.disabled = false;
             obj2.disabled = false;
         }
+
+        if (typeCheck(obj1, obj2, map.types.PLAYER, map.types.TURRET)) {
+            var turret = (obj1.type === map.types.TURRET) ? obj1 : obj2;
+            var player = (obj1.type === map.types.PLAYER) ? obj1 : obj2;
+            turret.markedForRemoval = true;
+            player.debree = player.debree + 1;
+        }
+        if (typeCheck(obj1, obj2, map.types.PLAYER, map.types.SHOT)) {
+            var player = (obj1.type === map.types.PLAYER) ? obj1 : obj2;
+            player.disabled = true;
+        }
+        if (typeCheck(obj1, obj2, map.types.SHOT, map.types.FLYER)) {
+            var flyer = (obj1.type === map.types.FLYER) ? obj1 : obj2;
+            flyer.markedForRemoval = true;
+        }
+        if (typeCheck(obj1, obj2, map.types.SHOT, map.types.GRUNT)) {
+            var grunt = (obj1.type === map.types.GRUNT) ? obj1 : obj2;
+            grunt.markedForRemoval = true;
+        }
+
         if (typeCheck(obj1, obj2, map.types.PLAYER, map.types.FLYER)) {
             var player = (obj1.type === map.types.PLAYER) ? obj1 : obj2;
             player.disabled = true;
@@ -422,9 +524,16 @@ define('game', [
             var player = (obj1.type === map.types.PLAYER) ? obj1 : obj2;
             player.disabled = true;
         }
+
         if (typeCheck(obj1, obj2, map.types.PUNCH, map.types.FLYER)) {
             var flyer = (obj1.type === map.types.FLYER) ? obj1 : obj2;
             flyer.markedForRemoval = true;
+        }
+
+        if (typeCheck(obj1, obj2, map.types.SHOT, map.types.MOTHERSHIP)) {
+            var mothership = (obj1.type === map.types.MOTHERSHIP) ? obj1 : obj2;
+            mothership.hp = mothership.hp - 0.04;
+            screenShaker.shake();
         }
         if (typeCheck(obj1, obj2, map.types.FLYER, map.types.MOTHERSHIP)) {
             var mothership = (obj1.type === map.types.MOTHERSHIP) ? obj1 : obj2;
