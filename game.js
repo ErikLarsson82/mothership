@@ -14,6 +14,7 @@ define('game', [
     // 144 or 60
     var DEBUG_WRITE_BUTTONS = false;
     var DEBUG_DRAW_WAYPOINTS = false;
+    var DEBUG_DRAW_3D = false;
     var FULLSCREEN = false;
 
     const FPS = 144;
@@ -26,6 +27,13 @@ define('game', [
     window.gameObjects = gameObjects;
 
     const GRID_SIZE = 20;
+
+    var playerImg = new Image();
+    playerImg.src = "player.png";
+
+    var images = {
+        player: playerImg
+    }
 
     var canvas = document.getElementById('canvas');
     var context = canvas.getContext('2d');
@@ -56,6 +64,9 @@ define('game', [
             }
             context.fillStyle = this.color;
             context.fillRect(this.pos.x, this.pos.y, GRID_SIZE, GRID_SIZE);
+        }
+        draw3d() {
+
         }
     }
 
@@ -535,6 +546,9 @@ define('game', [
             context.rect(this.pos.x, this.pos.y, GRID_SIZE, GRID_SIZE);
             context.stroke();
         }
+        draw3d() {
+            context.drawImage(images.player, this.pos.x, this.pos.y - 35);
+        }
     }
 
     class WaveController {
@@ -980,6 +994,12 @@ define('game', [
             _.each(gameObjects, function(gameObject) {
                 gameObject.draw();
             });
+
+            if (DEBUG_DRAW_3D) {
+                _.each(gameObjects, function(gameObject) {
+                    gameObject.draw3d();
+                });
+            }
 
             //GUI
             context.fillStyle = "white"
