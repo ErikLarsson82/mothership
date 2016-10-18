@@ -62,7 +62,7 @@ define('game', [
     class Flyer extends GameObject {
         constructor(pos, type) {
             super(pos, type);
-            this.color = "gray";
+            this.color = "white";
         }
         tick() {
             var motherPos = findGameObj(map.types.MOTHERSHIP).pos;
@@ -74,12 +74,17 @@ define('game', [
             }
             attemptMove(this, newPos);   
         }
+        draw() {
+            super.draw();
+            context.strokeStyle = "red";
+            context.strokeRect(this.pos.x, this.pos.y, GRID_SIZE, GRID_SIZE);
+        }
     }
 
     class Grunt extends GameObject {
         constructor(pos, type) {
             super(pos, type);
-            this.color = "#2f2f2f";
+            this.color = "#ff243b";
         }
         tick() {
             var motherPos = findGameObj(map.types.MOTHERSHIP).pos;
@@ -97,7 +102,7 @@ define('game', [
         constructor(pos, type, id) {
             super(pos, type);
             this.id = id;
-            this.color = "red";
+            this.color = "#606060";
         }
     }
 
@@ -656,9 +661,6 @@ define('game', [
 
             context.font="20px Verdana";
 
-            findGameObjWithIndex(map.types.PLAYER, 1).disabled = true;
-            findGameObjWithIndex(map.types.PLAYER, 2).disabled = true;
-
             if (FULLSCREEN) {
                 canvas.style.height = "100%";
                 canvas.style.width = "100%";
@@ -710,7 +712,8 @@ define('game', [
             //GUI
             context.fillStyle = "white"
             var mothership = findGameObj(map.types.MOTHERSHIP);
-            context.fillText('Mothership HP: ' + mothership.hp.toFixed(0),400,16);
+            context.fillText('Mothership HP: ' + mothership.hp.toFixed(0),400,17);
+            context.fillText('Wave ' + waveController.waves.length,900,17);
 
             screenShaker.restore();
         }
