@@ -119,7 +119,7 @@ define('game', [
                 this.hp = this.hp - 5;
                 this.immune = 70;
             } else {
-                this.hp = this.hp - 0.1;
+                this.hp = this.hp - 1;
                 this.immune = 70;
             }
             if (this.hp <= 0) this.markedForRemoval = true;
@@ -326,7 +326,7 @@ define('game', [
             this.color = "#fde0ff";
             this.scanDelayMax = 300;
             this.scanDelay = this.scanDelayMax;
-            this.ammo = 5;
+            this.ammo = 10;
         }
         tick() {
             super.tick();
@@ -346,7 +346,7 @@ define('game', [
         }
         resupply() {
             this.scanDelay = this.scanDelayMax * 1.5;
-            this.ammo = 5;
+            this.ammo = 10;
         }
         draw() {
             if (this.ammo === 0) {
@@ -687,7 +687,8 @@ define('game', [
             [map.types.PART, map.types.MINESHELL],
             [map.types.PART, map.types.TURRET],
             [map.types.PART, map.types.PUNCH],
-            [map.types.PART, map.types.SHOT]
+            [map.types.PART, map.types.SHOT],
+            [map.types.MINESHELL, map.types.GRUNT]
         ]
         return !!_.find(table, function(filter) {
             return obj1.type === filter[0] && obj2.type === filter[1] ||
