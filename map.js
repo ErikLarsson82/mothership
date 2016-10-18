@@ -86,9 +86,9 @@ define('map', [], function() {
             [WALL,WALL,WALL,WALL,WALL,WALL,WALL,WALL,WALL,WALL,WALL,WALL,WALL,WALL,WALL,WALL,WALL,WALL,WALL,WALL,WALL,WALL,WALL,WALL,WALL,WALL,WALL,WALL,WALL,WALL,WALL,WALL,WALL,WALL,WALL,WALL,WALL,WALL,WALL,WALL,WALL,WALL,WALL,WALL,WALL,WALL,WALL,WALL,WALL,WALL,WALL],
         ],
         waves: [
-            //{ duration: 10 },
+            { duration: 10 },
             { spawnIdx: 0, type: types.GRUNT },
-            //{ duration: 5 },
+            { duration: 5 },
             { spawnIdx: 2, type: types.FLYER },
             { duration: 5 },
             { spawnIdx: 1, type: types.GRUNT },

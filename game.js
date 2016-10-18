@@ -183,7 +183,7 @@ define('game', [
     class Punch extends GameObject {
         constructor(pos, type) {
             super(pos, type);
-            this.color = "#9c953e";
+            this.color = "#ed007d";
             this.duration = 10;
         }
         tick() {
@@ -213,7 +213,7 @@ define('game', [
     class Mine extends GameObject {
         constructor(pos, type) {
             super(pos, type);
-            this.color = "#8df9ff";
+            this.color = "#19ed00";
         }
         detonate() {
             this.markedForRemoval = true;
@@ -232,7 +232,7 @@ define('game', [
     class MineShell extends GameObject {
         constructor(pos, type) {
             super(pos, type);
-            this.color = "#8df9ff";
+            this.color = "#005b13";
         }
         draw() {
             context.strokeStyle = this.color;
@@ -305,10 +305,12 @@ define('game', [
             debugWriteButtons(pad);
             if (!(pad && pad.axes && pad.axes[2] && pad.axes[3])) return;
 
-            this.checkPickButton(pad);
-            this.checkPunch(pad);
-            this.checkPlaceMine(pad);
-            this.checkPlaceTurret(pad);
+            (this.id === 0) && this.checkPunch(pad);
+
+            (this.id === 1) && this.checkPlaceMine(pad);
+
+            (this.id === 1 || this.id === 2) && this.checkPickButton(pad);
+            (this.id === 2) && this.checkPlaceTurret(pad);
 
             var newPos = {
                 x: this.pos.x + pad.axes[0],    
@@ -451,17 +453,17 @@ define('game', [
         }
         draw() {
             context.fillStyle = this.color;
-            if (this.disabled) {
-                context.beginPath();
-                context.lineWidth = "2";
-                context.strokeStyle = this.color;
-                context.rect(this.pos.x, this.pos.y, GRID_SIZE, GRID_SIZE);
-                context.stroke();
-            } else {
+            var outlines = ["#ed007d", "#19ed00", "#eb8d00"];
+            if (!this.disabled) {
                 super.draw();
                 context.fillStyle = "white";
                 context.fillText(this.debree, this.pos.x + 3, this.pos.y + 18)
             }
+            context.beginPath();
+            context.lineWidth = "2";
+            context.strokeStyle = outlines[this.id];
+            context.rect(this.pos.x, this.pos.y, GRID_SIZE, GRID_SIZE);
+            context.stroke();
         }
     }
 
@@ -609,6 +611,7 @@ define('game', [
         if (typeCheck(obj1, obj2, map.types.TURRET, map.types.PLAYER)) {
             var turret = (obj1.type === map.types.TURRET) ? obj1 : obj2;
             var player = (obj1.type === map.types.PLAYER) ? obj1 : obj2;
+            if (player.id !== 2) return;
             if (player.isHoldingPickButton) {
                 turret.markedForRemoval = true;
                 player.debree = player.debree + 1;
@@ -649,12 +652,18 @@ define('game', [
         if (typeCheck(obj1, obj2, map.types.PLAYER, map.types.MINE)) {
             var player = (obj1.type === map.types.PLAYER) ? obj1 : obj2;
             var mine = (obj1.type === map.types.MINE) ? obj1 : obj2;
-            player.disabled = true;
-            mine.detonate();
+            if (player.id === 1 && player.isHoldingPickButton) {
+                player.debree = player.debree + 1;
+                mine.markedForRemoval = true;
+            } else {
+                player.disabled = true;
+                mine.detonate();
+            }
         }
         if (typeCheck(obj1, obj2, map.types.PLAYER, map.types.MINESHELL)) {
             var player = (obj1.type === map.types.PLAYER) ? obj1 : obj2;
             var mineshell = (obj1.type === map.types.MINESHELL) ? obj1 : obj2;
+            if (player.id !== 1) return;
             player.debree = player.debree + 1;
             mineshell.markedForRemoval = true;
         }
