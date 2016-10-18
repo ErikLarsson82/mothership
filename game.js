@@ -174,9 +174,45 @@ define('game', [
     }
 
     class Part extends GameObject {
-        constructor(pos, type) {
+        constructor(pos, type, requirement) {
             super(pos, type);
             this.color = "orange";
+            this.distance = GRID_SIZE * 3;
+            this.speed = 0.1;
+            this.requirement = requirement;
+        }
+        playerWithinReach(player) {
+            var withinX = (player.pos.x < this.pos.x + this.distance && player.pos.x > this.pos.x - this.distance)
+            var withinY = (player.pos.y < this.pos.y + this.distance && player.pos.y > this.pos.y - this.distance)
+            if (withinX && withinY) {
+                return true;
+            }
+            return false;
+        }
+        tick() {
+            _.chain(gameObjects)
+            .filter(function(gO) {
+                return gO.type === map.types.PLAYER;
+            })
+            .filter(function(player) {
+                return !player.disabled && this.playerWithinReach(player);
+            }.bind(this))
+            .each(function(player, idx) {
+                if (idx >= this.requirement) {
+                    var newPos = {
+                        x: this.pos.x,
+                        y: this.pos.y
+                    }
+                    newPos.x = (player.pos.x < this.pos.x) ? this.pos.x - this.speed : this.pos.x + this.speed;
+                    newPos.y = (player.pos.y < this.pos.y) ? this.pos.y - this.speed : this.pos.y + this.speed;
+                    attemptMove(this, newPos);  
+                }
+            }.bind(this));
+        }
+        draw() {
+            super.draw();
+            context.fillStyle = "black";
+            context.fillText(this.requirement+1, this.pos.x + 3, this.pos.y + 18)
         }
     }
 
@@ -285,6 +321,7 @@ define('game', [
             super(pos, type);
             this.color = "green";
             this.hp = 100;
+            this.parts = 0;
         }
     }
 
@@ -592,7 +629,15 @@ define('game', [
         //Every pair here ignores collisions
         var table = [
             [map.types.FLYER, map.types.MINE],
-            [map.types.FLYER, map.types.MINESHELL]
+            [map.types.FLYER, map.types.MINESHELL],
+            [map.types.PART, map.types.FLYER],
+            [map.types.PART, map.types.GRUNT],
+            [map.types.PART, map.types.DEBREE],
+            [map.types.PART, map.types.MINE],
+            [map.types.PART, map.types.MINESHELL],
+            [map.types.PART, map.types.TURRET],
+            [map.types.PART, map.types.PUNCH],
+            [map.types.PART, map.types.SHOT]
         ]
         return !!_.find(table, function(filter) {
             return obj1 === filter[0] && obj2 === filter[1] || obj2 === filter[0] && obj1 === filter[1];
@@ -618,6 +663,13 @@ define('game', [
             } else {
                 turret.resupply();
             }
+        }
+        // -------------------------------------------------------------------
+        if (typeCheck(obj1, obj2, map.types.PART, map.types.MOTHERSHIP)) {
+            var part = (obj1.type === map.types.PART) ? obj1 : obj2;
+            var mothership = (obj1.type === map.types.MOTHERSHIP) ? obj1 : obj2;
+            part.markedForRemoval = true;
+            mothership.parts = mothership.parts + 1;
         }
         // -------------------------------------------------------------------
 
@@ -772,8 +824,14 @@ define('game', [
                     case map.types.SPAWN3:
                         gameObjects.push(new Spawn({x: colIdx * GRID_SIZE, y: rowIdx * GRID_SIZE}, map.types.SPAWN, 2));
                     break;
-                    case map.types.PART:
-                        gameObjects.push(new Part({x: colIdx * GRID_SIZE, y: rowIdx * GRID_SIZE}, map.types.PART));
+                    case map.types.PART1:
+                        gameObjects.push(new Part({x: colIdx * GRID_SIZE, y: rowIdx * GRID_SIZE}, map.types.PART, 0));
+                    break;
+                    case map.types.PART2:
+                        gameObjects.push(new Part({x: colIdx * GRID_SIZE, y: rowIdx * GRID_SIZE}, map.types.PART, 1));
+                    break;
+                    case map.types.PART3:
+                        gameObjects.push(new Part({x: colIdx * GRID_SIZE, y: rowIdx * GRID_SIZE}, map.types.PART, 2));
                     break;
                     case map.types.MINE:
                         gameObjects.push(new Mine({x: colIdx * GRID_SIZE, y: rowIdx * GRID_SIZE}, map.types.MINE));
@@ -791,6 +849,9 @@ define('game', [
 
     function endConditions() {
         if (waveController.waves.length === 0 && allEnemiesOnMap().length === 0) {
+            return 1;
+        }
+        if (findGameObj(map.types.MOTHERSHIP).parts >= 3) {
             return 1;
         }
         if (findGameObj(map.types.MOTHERSHIP).hp <= 0) {
