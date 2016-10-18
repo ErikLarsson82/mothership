@@ -63,8 +63,27 @@ define('game', [
         constructor(pos, type) {
             super(pos, type);
             this.color = "white";
+            this.hp = 9;
+            this.immune = 0;
+        }
+        hurt(type) {
+            if (this.immune > 0) return;
+
+            if (type === map.types.PUNCH) {
+                this.hp = this.hp - 5;
+                this.immune = 70;
+            } else {
+                this.hp = this.hp - 0.1;
+                this.immune = 70;
+            }
+            if (this.hp <= 0) this.markedForRemoval = true;
         }
         tick() {
+            if (this.immune >= 0) {
+                this.immune--;
+                return;
+            }
+
             var motherPos = findGameObj(map.types.MOTHERSHIP).pos;
             var x = (motherPos.x > this.pos.x) ? this.pos.x + 0.1 : this.pos.x - 0.1;
             var y = (motherPos.y > this.pos.y) ? this.pos.y + 0.1 : this.pos.y - 0.1;
@@ -76,8 +95,15 @@ define('game', [
         }
         draw() {
             super.draw();
-            context.strokeStyle = "red";
+            context.strokeStyle = "#00f100";
             context.strokeRect(this.pos.x, this.pos.y, GRID_SIZE, GRID_SIZE);
+            context.fillStyle = "black";
+            context.fillText(this.hp.toFixed(0), this.pos.x + 3, this.pos.y + 18);
+
+            if (this.immune > 0) {
+                context.strokeStyle = "#4d4dff";
+                context.strokeRect(this.pos.x, this.pos.y, GRID_SIZE, GRID_SIZE);
+            }
         }
     }
 
@@ -85,8 +111,27 @@ define('game', [
         constructor(pos, type) {
             super(pos, type);
             this.color = "#ff243b";
+            this.hp = 9;
+            this.immune = 0;
+        }
+        hurt(type) {
+            if (this.immune > 0) return;
+
+            if (type === map.types.SHOT || type === map.types.MINE) {
+                this.hp = this.hp - 5;
+                this.immune = 70;
+            } else {
+                this.hp = this.hp - 0.1;
+                this.immune = 70;
+            }
+            if (this.hp <= 0) this.markedForRemoval = true;
         }
         tick() {
+            if (this.immune >= 0) {
+                this.immune--;
+                return;
+            }
+
             var motherPos = findGameObj(map.types.MOTHERSHIP).pos;
             var x = (motherPos.x > this.pos.x) ? this.pos.x + 0.1 : this.pos.x - 0.1;
             var y = (motherPos.y > this.pos.y) ? this.pos.y + 0.1 : this.pos.y - 0.1;
@@ -95,6 +140,16 @@ define('game', [
                 y: y
             }
             attemptMove(this, newPos);   
+        }
+        draw() {
+            super.draw();
+            context.fillStyle = "black";
+            context.fillText(this.hp.toFixed(0), this.pos.x + 3, this.pos.y + 18);
+
+            if (this.immune > 0) {
+                context.strokeStyle = "#4d4dff";
+                context.strokeRect(this.pos.x, this.pos.y, GRID_SIZE, GRID_SIZE);
+            }
         }
     }
 
@@ -148,9 +203,28 @@ define('game', [
             super(pos, type);
             this.color = "#8df9ff";
         }
+        detonate() {
+            this.markedForRemoval = true;
+            var placementPos = {
+                x: this.pos.x,
+                y: this.pos.y
+            }
+            gameObjects.push(new MineShell(placementPos, map.types.MINESHELL));
+        }
         tick() {
             super.tick();
             attemptMove(this, this.pos);
+        }
+    }
+
+    class MineShell extends GameObject {
+        constructor(pos, type) {
+            super(pos, type);
+            this.color = "#8df9ff";
+        }
+        draw() {
+            context.strokeStyle = this.color;
+            context.strokeRect(this.pos.x, this.pos.y, GRID_SIZE, GRID_SIZE);
         }
     }
 
@@ -482,7 +556,8 @@ define('game', [
     function collisionFilterIgnored(obj1, obj2) {
         //Every pair here ignores collisions
         var table = [
-            [map.types.FLYER, map.types.MINE]
+            [map.types.FLYER, map.types.MINE],
+            [map.types.FLYER, map.types.MINESHELL]
         ]
         return !!_.find(table, function(filter) {
             return obj1 === filter[0] && obj2 === filter[1] || obj2 === filter[0] && obj1 === filter[1];
@@ -490,31 +565,46 @@ define('game', [
     }
     
     function collision(obj1, obj2) {
-
-        if (obj1.type === map.types.PLAYER && obj2.type === map.types.PLAYER) {
-            obj1.disabled = false;
-            obj2.disabled = false;
+        if (typeCheck(obj1, obj2, map.types.TURRET, map.types.FLYER)) {
+            var turret = (obj1.type === map.types.TURRET) ? obj1 : obj2;
+            turret.markedForRemoval = true;
         }
-
-        if (typeCheck(obj1, obj2, map.types.PLAYER, map.types.TURRET)) {
+        if (typeCheck(obj1, obj2, map.types.TURRET, map.types.GRUNT)) {
+            var turret = (obj1.type === map.types.TURRET) ? obj1 : obj2;
+            turret.markedForRemoval = true;
+        }
+        if (typeCheck(obj1, obj2, map.types.TURRET, map.types.PLAYER)) {
             var turret = (obj1.type === map.types.TURRET) ? obj1 : obj2;
             var player = (obj1.type === map.types.PLAYER) ? obj1 : obj2;
             turret.markedForRemoval = true;
             player.debree = player.debree + 1;
         }
+        // -------------------------------------------------------------------
+
+        if (typeCheck(obj1, obj2, map.types.SHOT, map.types.FLYER)) {
+            var flyer = (obj1.type === map.types.FLYER) ? obj1 : obj2;
+            flyer.hurt(map.types.SHOT);
+        }
+        if (typeCheck(obj1, obj2, map.types.SHOT, map.types.GRUNT)) {
+            var grunt = (obj1.type === map.types.GRUNT) ? obj1 : obj2;
+            grunt.hurt(map.types.SHOT);
+        }
+        if (typeCheck(obj1, obj2, map.types.SHOT, map.types.MOTHERSHIP)) {
+            var mothership = (obj1.type === map.types.MOTHERSHIP) ? obj1 : obj2;
+            mothership.hp = mothership.hp - 0.04;
+            screenShaker.shake();
+        }
+        // -------------------------------------------------------------------
+
+
+        if (obj1.type === map.types.PLAYER && obj2.type === map.types.PLAYER) {
+            obj1.disabled = false;
+            obj2.disabled = false;
+        }
         if (typeCheck(obj1, obj2, map.types.PLAYER, map.types.SHOT)) {
             var player = (obj1.type === map.types.PLAYER) ? obj1 : obj2;
             player.disabled = true;
         }
-        if (typeCheck(obj1, obj2, map.types.SHOT, map.types.FLYER)) {
-            var flyer = (obj1.type === map.types.FLYER) ? obj1 : obj2;
-            flyer.markedForRemoval = true;
-        }
-        if (typeCheck(obj1, obj2, map.types.SHOT, map.types.GRUNT)) {
-            var grunt = (obj1.type === map.types.GRUNT) ? obj1 : obj2;
-            grunt.markedForRemoval = true;
-        }
-
         if (typeCheck(obj1, obj2, map.types.PLAYER, map.types.FLYER)) {
             var player = (obj1.type === map.types.PLAYER) ? obj1 : obj2;
             player.disabled = true;
@@ -523,38 +613,17 @@ define('game', [
             var player = (obj1.type === map.types.PLAYER) ? obj1 : obj2;
             var mine = (obj1.type === map.types.MINE) ? obj1 : obj2;
             player.disabled = true;
-            mine.markedForRemoval = true;
+            mine.detonate();
+        }
+        if (typeCheck(obj1, obj2, map.types.PLAYER, map.types.MINESHELL)) {
+            var player = (obj1.type === map.types.PLAYER) ? obj1 : obj2;
+            var mineshell = (obj1.type === map.types.MINESHELL) ? obj1 : obj2;
+            player.debree = player.debree + 1;
+            mineshell.markedForRemoval = true;
         }
         if (typeCheck(obj1, obj2, map.types.PLAYER, map.types.GRUNT)) {
             var player = (obj1.type === map.types.PLAYER) ? obj1 : obj2;
             player.disabled = true;
-        }
-
-        if (typeCheck(obj1, obj2, map.types.PUNCH, map.types.FLYER)) {
-            var flyer = (obj1.type === map.types.FLYER) ? obj1 : obj2;
-            flyer.markedForRemoval = true;
-        }
-
-        if (typeCheck(obj1, obj2, map.types.SHOT, map.types.MOTHERSHIP)) {
-            var mothership = (obj1.type === map.types.MOTHERSHIP) ? obj1 : obj2;
-            mothership.hp = mothership.hp - 0.04;
-            screenShaker.shake();
-        }
-        if (typeCheck(obj1, obj2, map.types.FLYER, map.types.MOTHERSHIP)) {
-            var mothership = (obj1.type === map.types.MOTHERSHIP) ? obj1 : obj2;
-            mothership.hp = mothership.hp - 0.01;
-            screenShaker.shake();
-        }
-        if (typeCheck(obj1, obj2, map.types.GRUNT, map.types.MINE)) {
-            var mine = (obj1.type === map.types.MINE) ? obj1 : obj2;
-            var grunt = (obj1.type === map.types.GRUNT) ? obj1 : obj2;
-            mine.markedForRemoval = true;
-            grunt.markedForRemoval = true;
-        }
-        if (typeCheck(obj1, obj2, map.types.GRUNT, map.types.MOTHERSHIP)) {
-            var mothership = (obj1.type === map.types.MOTHERSHIP) ? obj1 : obj2;
-            mothership.hp = mothership.hp - 0.03;
-            screenShaker.shake();
         }
         if (typeCheck(obj1, obj2, map.types.PLAYER, map.types.DEBREE)) {
             var player = (obj1.type === map.types.PLAYER) ? obj1 : obj2;
@@ -562,6 +631,40 @@ define('game', [
             player.debree = player.debree + 1;
             debree.markedForRemoval = true;
         }
+        // -------------------------------------------------------------------
+
+
+        if (typeCheck(obj1, obj2, map.types.PUNCH, map.types.FLYER)) {
+            var flyer = (obj1.type === map.types.FLYER) ? obj1 : obj2;
+            flyer.hurt(map.types.PUNCH);
+        }
+        if (typeCheck(obj1, obj2, map.types.PUNCH, map.types.GRUNT)) {
+            var grunt = (obj1.type === map.types.GRUNT) ? obj1 : obj2;
+            grunt.hurt(map.types.PUNCH);
+        }
+        // -------------------------------------------------------------------
+
+
+        if (typeCheck(obj1, obj2, map.types.FLYER, map.types.MOTHERSHIP)) {
+            var mothership = (obj1.type === map.types.MOTHERSHIP) ? obj1 : obj2;
+            mothership.hp = mothership.hp - 0.01;
+            screenShaker.shake();
+        }
+        // -------------------------------------------------------------------
+
+
+        if (typeCheck(obj1, obj2, map.types.GRUNT, map.types.MINE)) {
+            var mine = (obj1.type === map.types.MINE) ? obj1 : obj2;
+            var grunt = (obj1.type === map.types.GRUNT) ? obj1 : obj2;
+            mine.detonate();
+            grunt.markedForRemoval = true;
+        }
+        if (typeCheck(obj1, obj2, map.types.GRUNT, map.types.MOTHERSHIP)) {
+            var mothership = (obj1.type === map.types.MOTHERSHIP) ? obj1 : obj2;
+            mothership.hp = mothership.hp - 0.03;
+            screenShaker.shake();
+        }
+        // -------------------------------------------------------------------
     }
 
     function attemptMove(gameObject, newPos) {
