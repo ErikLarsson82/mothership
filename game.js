@@ -234,11 +234,13 @@ define('game', [
             this.color = "#fde0ff";
             this.scanDelayMax = 300;
             this.scanDelay = this.scanDelayMax;
+            this.ammo = 5;
         }
         tick() {
             super.tick();
             this.scanDelay--;
-            if (this.scanDelay <= 0) {
+            if (this.scanDelay <= 0 && this.ammo > 0) {
+                this.ammo = this.ammo - 1;
                 this.scanDelay = this.scanDelayMax;
                 _.each([-GRID_SIZE*2,0,+GRID_SIZE*2], function(x) {
                     _.each([-GRID_SIZE*2,0,+GRID_SIZE*2], function(y) {
@@ -249,6 +251,20 @@ define('game', [
                     }.bind(this));
                 }.bind(this));
             }
+        }
+        resupply() {
+            this.scanDelay = this.scanDelayMax * 1.5;
+            this.ammo = 5;
+        }
+        draw() {
+            if (this.ammo === 0) {
+                context.strokeStyle = this.color;
+                context.strokeRect(this.pos.x, this.pos.y, GRID_SIZE, GRID_SIZE);
+            } else {
+                super.draw();
+            }
+            context.fillStyle = "black";
+            context.fillText(this.ammo.toFixed(0), this.pos.x + 3, this.pos.y + 18);
         }
     }
 
@@ -268,6 +284,7 @@ define('game', [
             this.debree = 1;
             this.disabled = false;
             this.cooldown = 0;
+            this.isHoldingPickButton = false;
         }
         tick() {
             if (this.disabled) return;
@@ -276,6 +293,7 @@ define('game', [
             debugWriteButtons(pad);
             if (!(pad && pad.axes && pad.axes[2] && pad.axes[3])) return;
 
+            this.checkPickButton(pad);
             this.checkPunch(pad);
             this.checkPlaceMine(pad);
             this.checkPlaceTurret(pad);
@@ -285,6 +303,9 @@ define('game', [
                 y: this.pos.y + pad.axes[1],    
             }
             attemptMove(this, newPos);
+        }
+        checkPickButton(pad) {
+            this.isHoldingPickButton = pad.buttons[7].pressed;
         }
         checkPlaceTurret(pad) {
             if (pad.buttons[6].pressed && this.cooldown <= 0 && this.debree > 0) {
@@ -576,8 +597,12 @@ define('game', [
         if (typeCheck(obj1, obj2, map.types.TURRET, map.types.PLAYER)) {
             var turret = (obj1.type === map.types.TURRET) ? obj1 : obj2;
             var player = (obj1.type === map.types.PLAYER) ? obj1 : obj2;
-            turret.markedForRemoval = true;
-            player.debree = player.debree + 1;
+            if (player.isHoldingPickButton) {
+                turret.markedForRemoval = true;
+                player.debree = player.debree + 1;
+            } else {
+                turret.resupply();
+            }
         }
         // -------------------------------------------------------------------
 
