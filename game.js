@@ -55,7 +55,19 @@ define('game', [
     class Debree extends GameObject {
         constructor(pos, type) {
             super(pos, type);
-            this.color = "blue";
+            this.color = "#80d0ff";
+            this.deconstructTime = 0;
+        }
+        deconstruct() {
+            this.deconstructTime = this.deconstructTime + 0.01;   
+        }
+        draw() {
+            context.fillStyle = "blue";
+            var x = (GRID_SIZE/2) + this.pos.x - this.deconstructTime/2;
+            var y = (GRID_SIZE/2) + this.pos.y - this.deconstructTime/2
+            context.fillRect(x, y, this.deconstructTime, this.deconstructTime);
+            context.strokeStyle = this.color;
+            context.strokeRect(this.pos.x, this.pos.y, GRID_SIZE, GRID_SIZE);
         }
     }
 
@@ -653,8 +665,12 @@ define('game', [
         if (typeCheck(obj1, obj2, map.types.PLAYER, map.types.DEBREE)) {
             var player = (obj1.type === map.types.PLAYER) ? obj1 : obj2;
             var debree = (obj1.type === map.types.DEBREE) ? obj1 : obj2;
-            player.debree = player.debree + 1;
-            debree.markedForRemoval = true;
+            if (debree.deconstructTime > GRID_SIZE) {
+                player.debree = player.debree + 1;
+                debree.markedForRemoval = true;
+            } else {
+                debree.deconstruct();
+            }
         }
         // -------------------------------------------------------------------
 
