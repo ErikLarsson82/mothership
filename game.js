@@ -13,9 +13,11 @@ define('game', [
 
     // 144 or 60
     var DEBUG_WRITE_BUTTONS = false;
+    var DEBUG_DRAW_WAYPOINTS = false;
     var FULLSCREEN = false;
 
     const FPS = 144;
+    const WAYPOINT_REGEX = /W[0-9](G|F)[0-9]/g;
 
     let gameObjects = [];
     let spawnObjects = [];
@@ -41,14 +43,35 @@ define('game', [
             this.pos = pos;
             this.markedForRemoval = false;
             this.color = "black";
+            this.isPhysical = true;
         }
         remove () {
             return this.markedForRemoval;
         }
         tick() {}
         draw() {
+            // TODO: move drawing to each class instead
+            if (!DEBUG_DRAW_WAYPOINTS && this.type.match(WAYPOINT_REGEX)) {
+                return
+            }
             context.fillStyle = this.color;
             context.fillRect(this.pos.x, this.pos.y, GRID_SIZE, GRID_SIZE);
+        }
+    }
+
+    class Waypoint extends GameObject {
+        constructor(pos, type) {
+            super(pos, type);
+            this.color = "#FFAAAA";
+            this.isPhysical = false;
+        }
+        tick() {}
+        draw() {
+            super.draw();
+            if (DEBUG_DRAW_WAYPOINTS) {
+                context.fillStyle = this.color;
+                context.fillRect(this.pos.x, this.pos.y, GRID_SIZE, GRID_SIZE);
+            }
         }
     }
 
@@ -120,11 +143,15 @@ define('game', [
     }
 
     class Grunt extends GameObject {
-        constructor(pos, type) {
+        constructor(pos, type, waypoints) {
             super(pos, type);
             this.color = "#ff243b";
             this.hp = 9;
             this.immune = 0;
+            this.speed = 0.1;
+            this.waypoints = waypoints;
+            this.currentTarget = this.waypoints[0];
+            this.collidedWithWaypoint(this.currentTarget);
         }
         hurt(type) {
             if (this.immune > 0) return;
@@ -138,15 +165,21 @@ define('game', [
             }
             if (this.hp <= 0) this.markedForRemoval = true;
         }
+        collidedWithWaypoint(waypoint) {
+            if (this.currentTarget === waypoint) {
+                this.currentTarget = this.waypoints.shift();
+                // console.log('New waypoint', this.currentTarget)
+            }
+        }
         tick() {
             if (this.immune >= 0) {
                 this.immune--;
                 return;
             }
 
-            var motherPos = findGameObj(map.types.MOTHERSHIP).pos;
-            var x = (motherPos.x > this.pos.x) ? this.pos.x + 0.1 : this.pos.x - 0.1;
-            var y = (motherPos.y > this.pos.y) ? this.pos.y + 0.1 : this.pos.y - 0.1;
+            const targetPos = this.currentTarget.pos;
+            var x = (targetPos.x > this.pos.x) ? this.pos.x + this.speed : this.pos.x - this.speed;
+            var y = (targetPos.y > this.pos.y) ? this.pos.y + this.speed : this.pos.y - this.speed;
             var newPos = {
                 x: x,
                 y: y
@@ -505,9 +538,10 @@ define('game', [
     }
 
     class WaveController {
-        constructor(waves) {
+        constructor(waves, waypointCollections) {
             this.waves = waves || [];
             this.currentWave = null;
+            this.waypointCollections = waypointCollections;
         }
         tick() {
             if (this.currentWave) {
@@ -532,9 +566,11 @@ define('game', [
                         case map.types.GRUNT:
                             var targetPos = _.clone(findGameObjWithIndex(map.types.SPAWN, blueprint.spawnIdx).pos);
                             var motherPos = findGameObj(map.types.MOTHERSHIP).pos;
+                            var waypoints = _.clone(this.waypointCollections.gruntSpawns[blueprint.spawnIdx]);
+                            waypoints.push(findGameObj(map.types.MOTHERSHIP));
                             targetPos.x = (motherPos.x > targetPos.x) ? targetPos.x + GRID_SIZE : targetPos.x - GRID_SIZE;
                             targetPos.y = (motherPos.y > targetPos.y) ? targetPos.y + GRID_SIZE : targetPos.y - GRID_SIZE;
-                            gameObjects.push(new Grunt(targetPos, map.types.GRUNT));
+                            gameObjects.push(new Grunt(targetPos, map.types.GRUNT, waypoints));
                         break;
                     }
                 }
@@ -640,8 +676,9 @@ define('game', [
             [map.types.PART, map.types.SHOT]
         ]
         return !!_.find(table, function(filter) {
-            return obj1 === filter[0] && obj2 === filter[1] || obj2 === filter[0] && obj1 === filter[1];
-        });
+            return obj1.type === filter[0] && obj2.type === filter[1] ||
+                obj2.type === filter[0] && obj1.type === filter[1];
+        }) || !obj1.isPhysical || !obj2.isPhysical;
     }
 
     function collision(obj1, obj2) {
@@ -767,6 +804,14 @@ define('game', [
             screenShaker.shake();
         }
         // -------------------------------------------------------------------
+
+        // Waypoints
+        if ((obj1.type === map.types.GRUNT || obj2.type === map.types.GRUNT) &&
+            (obj1.type.match(WAYPOINT_REGEX) || obj2.type.match(WAYPOINT_REGEX))) {
+            const grunt = (obj1.type === map.types.GRUNT) ? obj1 : obj2;
+            const waypoint = obj1 === grunt ? obj2 : obj1;
+            grunt.collidedWithWaypoint(waypoint)
+        }
     }
 
     function attemptMove(gameObject, newPos) {
@@ -778,7 +823,7 @@ define('game', [
                 (gameObject.pos.y > obj.pos.y + GRID_SIZE) || (gameObject.pos.y + GRID_SIZE < obj.pos.y)
             );
             if (!legal) collision(gameObject, obj);
-            return !legal && !collisionFilterIgnored(gameObject.type, obj.type);
+            return !legal && !collisionFilterIgnored(gameObject, obj);
         });
         var somethingBlockedY = _.find(gameObjects, function(obj) {
             if (gameObject === obj) return false;
@@ -787,7 +832,7 @@ define('game', [
                 (newPos.y > obj.pos.y + GRID_SIZE) || (newPos.y + GRID_SIZE < obj.pos.y)
             );
             if (!legal) collision(gameObject, obj);
-            return !legal && !collisionFilterIgnored(gameObject.type, obj.type);
+            return !legal && !collisionFilterIgnored(gameObject, obj);
         });
         (somethingBlockedX) ? null : gameObject.pos.x = newPos.x;
         (somethingBlockedY) ? null : gameObject.pos.y = newPos.y;
@@ -837,6 +882,11 @@ define('game', [
                         gameObjects.push(new Mine({x: colIdx * GRID_SIZE, y: rowIdx * GRID_SIZE}, map.types.MINE));
                     break;
                 }
+
+                // Waypoints
+                if (item && item.match(WAYPOINT_REGEX)) {
+                    gameObjects.push(new Waypoint({x: colIdx * GRID_SIZE, y: rowIdx * GRID_SIZE}, item));
+                }
             });
         });
     }
@@ -870,7 +920,15 @@ define('game', [
     return {
         init: function() {
             generateMap();
-            waveController = new WaveController(map.waves);
+            const waypointCollections = {
+                gruntSpawns: map.waypointCollections.gruntSpawns.map(function (gruntSpawn) {
+                    return gruntSpawn.map(function (waypointName) {
+                        return findGameObj(waypointName);
+                    })
+                }),
+                // TODO: do for additional enemy types
+            };
+            waveController = new WaveController(map.waves, waypointCollections);
             screenShaker = new ScreenShaker();
 
             context.font="20px Verdana";
