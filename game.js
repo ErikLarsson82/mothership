@@ -34,7 +34,7 @@ define('game', [
             if (button.pressed) console.log(idx + " pressed");
         })
     }
-    
+
     class GameObject {
         constructor(pos, type) {
             this.type = type;
@@ -59,7 +59,7 @@ define('game', [
             this.deconstructTime = 0;
         }
         deconstruct() {
-            this.deconstructTime = this.deconstructTime + 0.01;   
+            this.deconstructTime = this.deconstructTime + 0.01;
         }
         draw() {
             context.fillStyle = "blue";
@@ -103,7 +103,7 @@ define('game', [
                 x: x,
                 y: y
             }
-            attemptMove(this, newPos);   
+            attemptMove(this, newPos);
         }
         draw() {
             super.draw();
@@ -151,7 +151,7 @@ define('game', [
                 x: x,
                 y: y
             }
-            attemptMove(this, newPos);   
+            attemptMove(this, newPos);
         }
         draw() {
             super.draw();
@@ -205,7 +205,7 @@ define('game', [
                     }
                     newPos.x = (player.pos.x < this.pos.x) ? this.pos.x - this.speed : this.pos.x + this.speed;
                     newPos.y = (player.pos.y < this.pos.y) ? this.pos.y - this.speed : this.pos.y + this.speed;
-                    attemptMove(this, newPos);  
+                    attemptMove(this, newPos);
                 }
             }.bind(this));
         }
@@ -340,7 +340,7 @@ define('game', [
             this.cooldown--;
             var pad = userInput.readInput()[this.id];
             debugWriteButtons(pad);
-            if (!(pad && pad.axes && pad.axes[2] && pad.axes[3])) return;
+            if (!(pad && pad.axes && pad.axes[2] !== null && pad.axes[3] !== null)) return;
 
             (this.id === 0) && this.checkPunch(pad);
 
@@ -350,8 +350,8 @@ define('game', [
             (this.id === 2) && this.checkPlaceTurret(pad);
 
             var newPos = {
-                x: this.pos.x + pad.axes[0],    
-                y: this.pos.y + pad.axes[1],    
+                x: this.pos.x + pad.axes[0],
+                y: this.pos.y + pad.axes[1],
             }
             attemptMove(this, newPos);
         }
@@ -620,7 +620,7 @@ define('game', [
             return item.type === type && item.id === idx;
         })
     }
-    
+
     function typeCheck(obj1, obj2, type1, type2) {
         return (obj1.type === type1 && obj2.type === type2 || obj2.type === type1 && obj1.type === type2)
     }
@@ -643,7 +643,7 @@ define('game', [
             return obj1 === filter[0] && obj2 === filter[1] || obj2 === filter[0] && obj1 === filter[1];
         });
     }
-    
+
     function collision(obj1, obj2) {
         if (typeCheck(obj1, obj2, map.types.TURRET, map.types.FLYER)) {
             var turret = (obj1.type === map.types.TURRET) ? obj1 : obj2;
@@ -836,7 +836,7 @@ define('game', [
                     case map.types.MINE:
                         gameObjects.push(new Mine({x: colIdx * GRID_SIZE, y: rowIdx * GRID_SIZE}, map.types.MINE));
                     break;
-                }   
+                }
             });
         });
     }
