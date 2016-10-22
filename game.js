@@ -110,11 +110,16 @@ define('game', [
     }
 
     class Flyer extends GameObject {
-        constructor(pos) {
+        constructor(pos, waypoints) {
             super(pos);
             this.color = "white";
             this.hp = 9;
             this.immune = 0;
+            this.speed = 0.1;
+            this.waypoints = waypoints;
+            console.log(waypoints)
+            this.currentTarget = this.waypoints[0];
+            this.collidedWithWaypoint(this.currentTarget);
         }
         hurt(obj) {
             if (this.immune > 0) return;
@@ -128,19 +133,18 @@ define('game', [
             }
             if (this.hp <= 0) this.markedForRemoval = true;
         }
+        collidedWithWaypoint(waypoint) {
+            if (this.currentTarget === waypoint) {
+                this.currentTarget = this.waypoints.shift();
+            }
+        }
         tick() {
             if (this.immune >= 0) {
                 this.immune--;
                 return;
             }
 
-            var motherPos = findGameObj(Mothership).pos;
-            var x = (motherPos.x > this.pos.x) ? this.pos.x + 0.1 : this.pos.x - 0.1;
-            var y = (motherPos.y > this.pos.y) ? this.pos.y + 0.1 : this.pos.y - 0.1;
-            var newPos = {
-                x: x,
-                y: y
-            }
+            const newPos = getNewPosition(this, this.currentTarget);
             attemptMove(this, newPos);
         }
         draw() {
@@ -190,7 +194,7 @@ define('game', [
                 this.immune--;
                 return;
             }
-            
+
             const newPos = getNewPosition(this, this.currentTarget);
             attemptMove(this, newPos);
         }
@@ -570,9 +574,11 @@ define('game', [
                         case types.FLYER:
                             var targetPos = _.clone(findGameObjWithIndex(Spawn, blueprint.spawnIdx).pos);
                             var motherPos = findGameObj(Mothership).pos;
+                            var waypoints = _.clone(this.waypointCollections.flyerSpawns[blueprint.spawnIdx]);
+                            waypoints.push(findGameObj(Mothership));
                             targetPos.x = (motherPos.x > targetPos.x) ? targetPos.x + GRID_SIZE : targetPos.x - GRID_SIZE;
                             targetPos.y = (motherPos.y > targetPos.y) ? targetPos.y + GRID_SIZE : targetPos.y - GRID_SIZE;
-                            gameObjects.push(new Flyer(targetPos));
+                            gameObjects.push(new Flyer(targetPos, waypoints));
                         break;
                         case types.GRUNT:
                             var targetPos = _.clone(findGameObjWithIndex(Spawn, blueprint.spawnIdx).pos);
@@ -847,6 +853,12 @@ define('game', [
             const waypoint = (obj1 instanceof Waypoint) ? obj1 : obj2;
             grunt.collidedWithWaypoint(waypoint)
         }
+
+        if (typeCheck(obj1, obj2, Flyer, Waypoint)) {
+            const flyer = (obj1 instanceof Flyer) ? obj1 : obj2;
+            const waypoint = (obj1 instanceof Waypoint) ? obj1 : obj2;
+            flyer.collidedWithWaypoint(waypoint)
+        }
     }
 
     function attemptMove(gameObject, newPos) {
@@ -955,7 +967,11 @@ define('game', [
                         return findGameObjByMapString(waypointName);
                     })
                 }),
-                // TODO: do for additional enemy types
+                flyerSpawns: map.waypointCollections.flyerSpawns.map(function (flyerSpawn) {
+                    return flyerSpawn.map(function (waypointName) {
+                        return findGameObjByMapString(waypointName);
+                    })
+                }),
             };
             waveController = new WaveController(map.waves, waypointCollections);
             screenShaker = new ScreenShaker();
