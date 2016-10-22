@@ -98,7 +98,7 @@ define('game', [
             this.deconstructTime = 0;
         }
         deconstruct() {
-            this.deconstructTime = this.deconstructTime + 0.01;
+            this.deconstructTime = this.deconstructTime + 0.03;
         }
         draw() {
             context.fillStyle = "blue";
@@ -122,19 +122,19 @@ define('game', [
         }
         hurt(obj, origin) {
             if (obj instanceof Punch) {
-                this.hp = this.hp - 5;
+                this.hp = this.hp - 0;
             } else if (obj instanceof Explosion) {
                 this.hp = this.hp - 10;
             } else {
-                this.hp = this.hp - 3;
+                this.hp = this.hp - 2;
             }
             if (this.hp <= 0) this.markedForRemoval = true;
 
-            if (obj.strength) {
-                const distance = getDistance(this.pos, origin.pos);
+            if (obj.strength && origin) {
+                const distance = getDistance(this.pos, origin);
                 this.hitStrength = obj.strength;
-                this.hitAngle = getAngle(this.pos, origin.pos) + Math.PI;
-                this.hitMoveFrames = Math.round(this.hitStrength);
+                this.hitAngle = getAngle(this.pos, origin) + Math.PI;
+                this.hitMoveFrames = 15;
                 this.isMovingFromHit = true;
             }
         }
@@ -184,10 +184,14 @@ define('game', [
             this.waypoints = waypoints;
             this.currentTarget = this.waypoints[0];
             this.collidedWithWaypoint(this.currentTarget);
+            this.isStunned = false;
+            this.stunnedCounter = 0;
         }
         hurt(obj, origin) {
             if (obj instanceof Shot) {
-                this.hp = this.hp - 1;
+                this.hp = this.hp - 2;
+                this.isStunned = true;
+                this.stunnedCounter = Math.round(FPS * 2);
             } else if (obj instanceof Explosion) {
                 this.hp = this.hp - 10;
             } else {
@@ -195,11 +199,11 @@ define('game', [
             }
             if (this.hp <= 0) this.markedForRemoval = true;
 
-            if (obj.strength) {
-                const distance = getDistance(this.pos, origin.pos);
+            if (obj.strength && origin) {
+                const distance = getDistance(this.pos, origin);
                 this.hitStrength = obj.strength;
-                this.hitAngle = getAngle(this.pos, origin.pos) + Math.PI;
-                this.hitMoveFrames = Math.round(this.hitStrength);
+                this.hitAngle = getAngle(this.pos, origin) + Math.PI;
+                this.hitMoveFrames = 15;
                 this.isMovingFromHit = true;
             }
         }
@@ -209,7 +213,10 @@ define('game', [
             }
         }
         tick() {
-            let newPos;
+            let newPos = {
+                x: this.pos.x,
+                y: this.pos.y
+            };
 
             if (this.isMovingFromHit) {
                 this.hitStrength *= MOVING_FROM_HIT_SMOOTHING;
@@ -221,6 +228,11 @@ define('game', [
                     y: this.pos.y + Math.sin(this.hitAngle) * this.hitStrength,
                 });
                 this.isMovingFromHit = this.hitMoveFrames-- > 0;
+            } else if (this.isStunned) {
+                this.stunnedCounter--;
+                if (this.stunnedCounter <= 0) {
+                    this.isStunned = false;
+                }
             } else {
                 const speed = this.speed;
                 const targetPos = this.currentTarget.pos;
@@ -296,7 +308,7 @@ define('game', [
             this.color = "#ed007d";
             this.duration = 10;
             this.consumed = false;
-            this.strength = 16;
+            this.strength = 5;
         }
         dmg() {
             var dmg = (this.consumed) ? 0 : 1;
@@ -312,11 +324,13 @@ define('game', [
     }
 
     class Shot extends GameObject {
-        constructor(pos) {
+        constructor(pos, turret) {
             super(pos);
             this.color = "#6b0b00";
             this.duration = 10;
             this.consumed = false;
+            this.strength = 5;
+            this.origin = turret.pos;
         }
         dmg() {
             var dmg = (this.consumed) ? 0 : 1;
@@ -451,7 +465,7 @@ define('game', [
                         var pos = _.clone(this.pos);
                         pos.x = pos.x + x;
                         pos.y = pos.y + y;
-                        addGameObject(new Shot(pos));
+                        addGameObject(new Shot(pos, this));
                     }.bind(this));
                 }.bind(this));
             }
@@ -504,7 +518,7 @@ define('game', [
             super(pos);
             this.id = id;
             this.color = "purple";
-            this.debree = 1;
+            this.debree = 9;
             this.disabled = false;
             this.cooldown = 0;
             this.isHoldingPickButton = false;
@@ -834,7 +848,8 @@ define('game', [
             [Part, Turret],
             [Part, Punch],
             [Part, Shot],
-            [MineShell, Grunt]
+            [MineShell, Grunt],
+            [Flyer, Grunt]
         ]
         return !!_.find(table, function(filter) {
             return typeCheck(obj1, obj2, filter[0], filter[1]);
@@ -844,11 +859,17 @@ define('game', [
     function collision(obj1, obj2) {
         if (typeCheck(obj1, obj2, Turret, Flyer)) {
             var turret = (obj1 instanceof Turret) ? obj1 : obj2;
-            turret.destroy();
+            var flyer = (obj1 instanceof Flyer) ? obj1 : obj2;
+            if (!flyer.isMovingFromHit) {
+                turret.destroy();
+            }
         }
         if (typeCheck(obj1, obj2, Turret, Grunt)) {
             var turret = (obj1 instanceof Turret) ? obj1 : obj2;
-            turret.destroy();
+            var grunt = (obj1 instanceof Grunt) ? obj1 : obj2;
+            if (!grunt.isMovingFromHit) {
+                turret.destroy();
+            }
         }
         if (typeCheck(obj1, obj2, Turret, Player)) {
             var turret = (obj1 instanceof Turret) ? obj1 : obj2;
@@ -886,7 +907,7 @@ define('game', [
             var flyer = (obj1 instanceof Flyer) ? obj1 : obj2;
             var shot = (obj1 instanceof Shot) ? obj1 : obj2;
             var dmg = shot.dmg();
-            if (dmg) flyer.hurt(shot);
+            if (dmg) flyer.hurt(shot, shot.origin);
         }
         if (typeCheck(obj1, obj2, Shot, Grunt)) {
             var grunt = (obj1 instanceof Grunt) ? obj1 : obj2;
@@ -947,13 +968,13 @@ define('game', [
             var flyer = (obj1 instanceof Flyer) ? obj1 : obj2;
             var punch = (obj1 instanceof Punch) ? obj1 : obj2;
             var dmg = punch.dmg();
-            if (dmg) flyer.hurt(punch, findGameObjWithIndex(Player, 0));
+            if (dmg) flyer.hurt(punch, findGameObjWithIndex(Player, 0).pos);
         }
         if (typeCheck(obj1, obj2, Punch, Grunt)) {
             var grunt = (obj1 instanceof Grunt) ? obj1 : obj2;
             var punch = (obj1 instanceof Punch) ? obj1 : obj2;
             var dmg = punch.dmg();
-            if (dmg) grunt.hurt(punch, findGameObjWithIndex(Player, 0));
+            if (dmg) grunt.hurt(punch, findGameObjWithIndex(Player, 0).pos);
         }
         // -------------------------------------------------------------------
 
