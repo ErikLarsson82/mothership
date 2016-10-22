@@ -117,7 +117,6 @@ define('game', [
             this.immune = 0;
             this.speed = 0.1;
             this.waypoints = waypoints;
-            console.log(waypoints)
             this.currentTarget = this.waypoints[0];
             this.collidedWithWaypoint(this.currentTarget);
         }
