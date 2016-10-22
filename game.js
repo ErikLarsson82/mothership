@@ -13,7 +13,7 @@ define('game', [
     var DEBUG_WRITE_BUTTONS = false;
     var DEBUG_DRAW_WAYPOINTS = false;
     var DEBUG_DRAW_3D = false;
-    var FULLSCREEN = false;
+    var FULLSCREEN = !false;
     var DEBUG_EXPOSE_TO_WINDOW = false;
 
     const FPS = 144;
@@ -122,11 +122,11 @@ define('game', [
         }
         hurt(obj, origin) {
             if (obj instanceof Punch) {
-                this.hp = this.hp - 4;
+                this.hp = this.hp - 1;
             } else if (obj instanceof Explosion) {
                 this.hp = this.hp - 10;
             } else {
-                this.hp = this.hp - 2;
+                this.hp = this.hp - 3;
             }
             if (this.hp <= 0) this.markedForRemoval = true;
 
@@ -303,12 +303,13 @@ define('game', [
     }
 
     class Punch extends GameObject {
-        constructor(pos) {
+        constructor(pos, player) {
             super(pos);
             this.color = "#ed007d";
             this.duration = 10;
             this.consumed = false;
             this.strength = 5;
+            this.origin = player.pos;
         }
         dmg() {
             var dmg = (this.consumed) ? 0 : 1;
@@ -518,7 +519,7 @@ define('game', [
             super(pos);
             this.id = id;
             this.color = "purple";
-            this.debree = 9;
+            this.debree = 1;
             this.disabled = false;
             this.cooldown = 0;
             this.isHoldingPickButton = false;
@@ -530,9 +531,9 @@ define('game', [
             debugWriteButtons(pad);
             if (!(pad && pad.axes && pad.axes[2] !== null && pad.axes[3] !== null)) return;
 
-            (this.id === 0) && this.checkPunch(pad);
+            (this.id === 0 || this.id === 2) && this.checkPunch(pad);
 
-            (this.id === 1) && this.checkPlaceMine(pad);
+            (this.id === 1 || this.id === 0) && this.checkPlaceMine(pad);
 
             (this.id === 1 || this.id === 2) && this.checkPickButton(pad);
             (this.id === 2) && this.checkPlaceTurret(pad);
@@ -652,7 +653,7 @@ define('game', [
                 var punchPos = _.clone(this.pos);
                 punchPos.x = punchPos.x + modifier.x;
                 punchPos.y = punchPos.y + modifier.y;
-                addGameObject(new Punch(punchPos));
+                addGameObject(new Punch(punchPos, this));
             }
         }
         draw() {
@@ -900,6 +901,12 @@ define('game', [
             var dmg = explosion.dmg();
             if (dmg) grunt.hurt(explosion);
         }
+        if (typeCheck(obj1, obj2, Explosion, Flyer)) {
+            var flyer = (obj1 instanceof Flyer) ? obj1 : obj2;
+            var explosion = (obj1 instanceof Explosion) ? obj1 : obj2;
+            var dmg = explosion.dmg();
+            if (dmg) flyer.hurt(explosion);
+        }
         if (typeCheck(obj1, obj2, Explosion, Player)) {
             var player = (obj1 instanceof Player) ? obj1 : obj2;
             player.disabled = true;
@@ -947,7 +954,7 @@ define('game', [
         if (typeCheck(obj1, obj2, Player, MineShell)) {
             var player = (obj1 instanceof Player) ? obj1 : obj2;
             var mineshell = (obj1 instanceof MineShell) ? obj1 : obj2;
-            if (player.id !== 1) return;
+            if (player.id !== 0) return;
             player.debree = player.debree + mineshell.consume();
             mineshell.markedForRemoval = true;
         }
@@ -972,13 +979,13 @@ define('game', [
             var flyer = (obj1 instanceof Flyer) ? obj1 : obj2;
             var punch = (obj1 instanceof Punch) ? obj1 : obj2;
             var dmg = punch.dmg();
-            if (dmg) flyer.hurt(punch, findGameObjWithIndex(Player, 0).pos);
+            if (dmg) flyer.hurt(punch, punch.origin);
         }
         if (typeCheck(obj1, obj2, Punch, Grunt)) {
             var grunt = (obj1 instanceof Grunt) ? obj1 : obj2;
             var punch = (obj1 instanceof Punch) ? obj1 : obj2;
             var dmg = punch.dmg();
-            if (dmg) grunt.hurt(punch, findGameObjWithIndex(Player, 0).pos);
+            if (dmg) grunt.hurt(punch, punch.origin);
         }
         // -------------------------------------------------------------------
 
@@ -1102,7 +1109,7 @@ define('game', [
         }
         if (
             findGameObjWithIndex(Player, 0).disabled &&
-            findGameObjWithIndex(Player, 1).disabled &&
+            //findGameObjWithIndex(Player, 1).disabled &&
             findGameObjWithIndex(Player, 2).disabled
         ) {
             return 2;
