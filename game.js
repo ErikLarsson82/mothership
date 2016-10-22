@@ -18,6 +18,7 @@ define('game', [
 
     const FPS = 144;
     const WAYPOINT_REGEX = /W[0-9](G|F)[0-9]/g;
+    const MOVING_FROM_HIT_SMOOTHING = 0.9;
 
     let gameObjects = [];
     let spawnObjects = [];
@@ -119,7 +120,7 @@ define('game', [
             this.currentTarget = this.waypoints[0];
             this.collidedWithWaypoint(this.currentTarget);
         }
-        hurt(obj) {
+        hurt(obj, origin) {
             if (obj instanceof Punch) {
                 this.hp = this.hp - 5;
             } else if (obj instanceof Explosion) {
@@ -128,6 +129,14 @@ define('game', [
                 this.hp = this.hp - 3;
             }
             if (this.hp <= 0) this.markedForRemoval = true;
+
+            if (obj.strength) {
+                const distance = getDistance(this.pos, origin.pos);
+                this.hitStrength = obj.strength;
+                this.hitAngle = getAngle(this.pos, origin.pos) + Math.PI;
+                this.hitMoveFrames = Math.round(this.hitStrength);
+                this.isMovingFromHit = true;
+            }
         }
         collidedWithWaypoint(waypoint) {
             if (this.currentTarget === waypoint) {
@@ -135,7 +144,26 @@ define('game', [
             }
         }
         tick() {
-            const newPos = getNewPosition(this, this.currentTarget);
+            let newPos;
+
+            if (this.isMovingFromHit) {
+                newPos = getNewPosition({
+                    pos: this.pos,
+                    speed: this.hitStrength,
+                }, {
+                    x: this.pos.x + Math.cos(this.hitAngle) * this.hitStrength,
+                    y: this.pos.y + Math.sin(this.hitAngle) * this.hitStrength,
+                });
+                this.isMovingFromHit = this.hitMoveFrames-- > 0;
+            } else {
+                const speed = this.speed;
+                const targetPos = this.currentTarget.pos;
+                newPos = getNewPosition({
+                    pos: this.pos,
+                    speed: speed,
+                }, targetPos);
+            }
+
             attemptMove(this, newPos);
         }
         draw() {
@@ -157,7 +185,7 @@ define('game', [
             this.currentTarget = this.waypoints[0];
             this.collidedWithWaypoint(this.currentTarget);
         }
-        hurt(obj) {
+        hurt(obj, origin) {
             if (obj instanceof Shot) {
                 this.hp = this.hp - 1;
             } else if (obj instanceof Explosion) {
@@ -166,6 +194,14 @@ define('game', [
                 this.hp = this.hp - 1;
             }
             if (this.hp <= 0) this.markedForRemoval = true;
+
+            if (obj.strength) {
+                const distance = getDistance(this.pos, origin.pos);
+                this.hitStrength = obj.strength;
+                this.hitAngle = getAngle(this.pos, origin.pos) + Math.PI;
+                this.hitMoveFrames = Math.round(this.hitStrength);
+                this.isMovingFromHit = true;
+            }
         }
         collidedWithWaypoint(waypoint) {
             if (this.currentTarget === waypoint) {
@@ -173,7 +209,27 @@ define('game', [
             }
         }
         tick() {
-            const newPos = getNewPosition(this, this.currentTarget);
+            let newPos;
+
+            if (this.isMovingFromHit) {
+                this.hitStrength *= MOVING_FROM_HIT_SMOOTHING;
+                newPos = getNewPosition({
+                    pos: this.pos,
+                    speed: this.hitStrength,
+                }, {
+                    x: this.pos.x + Math.cos(this.hitAngle) * this.hitStrength,
+                    y: this.pos.y + Math.sin(this.hitAngle) * this.hitStrength,
+                });
+                this.isMovingFromHit = this.hitMoveFrames-- > 0;
+            } else {
+                const speed = this.speed;
+                const targetPos = this.currentTarget.pos;
+                newPos = getNewPosition({
+                    pos: this.pos,
+                    speed: speed,
+                }, targetPos);
+            }
+
             attemptMove(this, newPos);
         }
         draw() {
@@ -240,6 +296,7 @@ define('game', [
             this.color = "#ed007d";
             this.duration = 10;
             this.consumed = false;
+            this.strength = 16;
         }
         dmg() {
             var dmg = (this.consumed) ? 0 : 1;
@@ -757,22 +814,32 @@ define('game', [
         return (obj1 instanceof klass1 && obj2 instanceof klass2 || obj2 instanceof klass1 && obj1 instanceof klass2)
     }
 
-    function getNewPosition(gameObject, target) {
-        const gameObjectPos = gameObject.pos;
-        if (!target) {
+    function getNewPosition(physicsObject, targetPos) {
+        // physicsObject { pos: { x, y }, speed }
+        const physicsObjectPos = physicsObject.pos;
+        if (!targetPos) {
             return {
-                x: gameObjectPos.x,
-                y: gameObjectPos.y,
+                x: physicsObjectPos.x,
+                y: physicsObjectPos.y,
             }
         }
-        const targetPos = target.pos;
-        const angle = Math.atan2(targetPos.y - gameObjectPos.y, targetPos.x - gameObjectPos.x);
-        const dx = Math.cos(angle) * gameObject.speed;
-        const dy = Math.sin(angle) * gameObject.speed;
+        const angle = getAngle(physicsObjectPos, targetPos);
+        const dx = Math.cos(angle) * physicsObject.speed;
+        const dy = Math.sin(angle) * physicsObject.speed;
         return {
-            x: gameObjectPos.x + dx,
-            y: gameObjectPos.y + dy,
+            x: physicsObjectPos.x + dx,
+            y: physicsObjectPos.y + dy,
         }
+    }
+
+    function getAngle(pos1, pos2) {
+        return Math.atan2(pos2.y - pos1.y, pos2.x - pos1.x);
+    }
+
+    function getDistance(pos1, pos2) {
+        const a = pos2.x - pos1.x;
+        const b = pos2.y - pos1.y;
+        return Math.sqrt(a * a + b * b);
     }
 
     function collisionFilterIgnored(obj1, obj2) {
@@ -901,13 +968,13 @@ define('game', [
             var flyer = (obj1 instanceof Flyer) ? obj1 : obj2;
             var punch = (obj1 instanceof Punch) ? obj1 : obj2;
             var dmg = punch.dmg();
-            if (dmg) flyer.hurt(punch);
+            if (dmg) flyer.hurt(punch, findGameObjWithIndex(Player, 0));
         }
         if (typeCheck(obj1, obj2, Punch, Grunt)) {
             var grunt = (obj1 instanceof Grunt) ? obj1 : obj2;
             var punch = (obj1 instanceof Punch) ? obj1 : obj2;
             var dmg = punch.dmg();
-            if (dmg) grunt.hurt(punch);
+            if (dmg) grunt.hurt(punch, findGameObjWithIndex(Player, 0));
         }
         // -------------------------------------------------------------------
 
