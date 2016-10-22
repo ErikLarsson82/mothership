@@ -122,7 +122,7 @@ define('game', [
         }
         hurt(obj, origin) {
             if (obj instanceof Punch) {
-                this.hp = this.hp - 0;
+                this.hp = this.hp - 4;
             } else if (obj instanceof Explosion) {
                 this.hp = this.hp - 10;
             } else {
@@ -840,6 +840,10 @@ define('game', [
         var table = [
             [Flyer, Mine],
             [Flyer, MineShell],
+            [Flyer, Grunt],
+            [Flyer, Turret],
+            [Flyer, Flyer],
+            [Flyer, Wall],
             [Part, Flyer],
             [Part, Grunt],
             [Part, Debree],
@@ -848,8 +852,7 @@ define('game', [
             [Part, Turret],
             [Part, Punch],
             [Part, Shot],
-            [MineShell, Grunt],
-            [Flyer, Grunt]
+            [MineShell, Grunt]
         ]
         return !!_.find(table, function(filter) {
             return typeCheck(obj1, obj2, filter[0], filter[1]);
