@@ -378,10 +378,10 @@ define('game', [
     class Turret extends GameObject {
         constructor(pos) {
             super(pos);
-            this.color = "#fde0ff";
+            this.color = "#ad8aff";
             this.scanDelayMax = 300;
             this.scanDelay = this.scanDelayMax;
-            this.ammo = 10;
+            this.ammo = 9;
         }
         tick() {
             super.tick();
@@ -401,7 +401,18 @@ define('game', [
         }
         resupply() {
             this.scanDelay = this.scanDelayMax * 1.5;
-            this.ammo = 10;
+            this.ammo = 9;
+        }
+        destroy() {
+            _.each([-GRID_SIZE*2,0,+GRID_SIZE*2], function(x) {
+                _.each([-GRID_SIZE*2,0,+GRID_SIZE*2], function(y) {
+                    var pos = _.clone(this.pos);
+                    pos.x = pos.x + x;
+                    pos.y = pos.y + y;
+                    addGameObject(new Explosion(pos));
+                }.bind(this));
+            }.bind(this));
+            this.markedForRemoval = true;
         }
         draw() {
             if (this.ammo === 0) {
@@ -409,8 +420,15 @@ define('game', [
                 context.strokeRect(this.pos.x, this.pos.y, GRID_SIZE, GRID_SIZE);
             } else {
                 super.draw();
+                context.fillStyle = "#793bff";
+                var size = GRID_SIZE - ((this.scanDelay / this.scanDelayMax) * GRID_SIZE);
+                var x = (GRID_SIZE/2) + this.pos.x - size/2;
+                var y = (GRID_SIZE/2) + this.pos.y - size/2;
+                context.fillRect(x, y, size, size); // 0 -> 0, 300 -> 20
+                context.strokeStyle = "#793bff";
+                context.strokeRect(this.pos.x, this.pos.y, GRID_SIZE, GRID_SIZE);
             }
-            context.fillStyle = "black";
+            context.fillStyle = "#bbffc2";
             context.fillText(this.ammo.toFixed(0), this.pos.x + 3, this.pos.y + 18);
         }
     }
@@ -780,11 +798,11 @@ define('game', [
     function collision(obj1, obj2) {
         if (typeCheck(obj1, obj2, Turret, Flyer)) {
             var turret = (obj1 instanceof Turret) ? obj1 : obj2;
-            turret.markedForRemoval = true;
+            turret.destroy();
         }
         if (typeCheck(obj1, obj2, Turret, Grunt)) {
             var turret = (obj1 instanceof Turret) ? obj1 : obj2;
-            turret.markedForRemoval = true;
+            turret.destroy();
         }
         if (typeCheck(obj1, obj2, Turret, Player)) {
             var turret = (obj1 instanceof Turret) ? obj1 : obj2;
