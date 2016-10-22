@@ -16,6 +16,7 @@ define('game', [
     var DEBUG_DRAW_WAYPOINTS = false;
     var DEBUG_DRAW_3D = false;
     var FULLSCREEN = false;
+    var DEBUG_EXPOSE_TO_WINDOW = false;
 
     const FPS = 144;
     const WAYPOINT_REGEX = /W[0-9](G|F)[0-9]/g;
@@ -24,8 +25,7 @@ define('game', [
     let spawnObjects = [];
     let waveController = null;
     let screenShaker = null;
-    window.gameObjects = gameObjects;
-
+    
     const GRID_SIZE = 20;
 
     var playerImg = new Image();
@@ -930,6 +930,10 @@ define('game', [
             return 2;
         }
         return false;
+    }
+
+    if (DEBUG_EXPOSE_TO_WINDOW) {
+        window.gameObjects = gameObjects;
     }
 
     return {
