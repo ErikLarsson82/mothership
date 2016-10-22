@@ -106,6 +106,11 @@ define('map', ['types'], function(types) {
                 [W1G0, W1G1],
                 [W2G0, W2G1, W2G2],
                 [W3G0, W3G1],
+            ],
+            flyerSpawns: [
+                [],
+                [],
+                [W3G0],
             ]
         },
         waves: [
