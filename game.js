@@ -190,14 +190,8 @@ define('game', [
                 this.immune--;
                 return;
             }
-
-            const targetPos = this.currentTarget.pos;
-            var x = (targetPos.x > this.pos.x) ? this.pos.x + this.speed : this.pos.x - this.speed;
-            var y = (targetPos.y > this.pos.y) ? this.pos.y + this.speed : this.pos.y - this.speed;
-            var newPos = {
-                x: x,
-                y: y
-            }
+            
+            const newPos = getNewPosition(this, this.currentTarget);
             attemptMove(this, newPos);
         }
         draw() {
@@ -683,6 +677,24 @@ define('game', [
 
     function typeCheck(obj1, obj2, klass1, klass2) {
         return (obj1 instanceof klass1 && obj2 instanceof klass2 || obj2 instanceof klass1 && obj1 instanceof klass2)
+    }
+
+    function getNewPosition(gameObject, target) {
+        const gameObjectPos = gameObject.pos;
+        if (!target) {
+            return {
+                x: gameObjectPos.x,
+                y: gameObjectPos.y,
+            }
+        }
+        const targetPos = target.pos;
+        const angle = Math.atan2(targetPos.y - gameObjectPos.y, targetPos.x - gameObjectPos.x);
+        const dx = Math.cos(angle) * gameObject.speed;
+        const dy = Math.sin(angle) * gameObject.speed;
+        return {
+            x: gameObjectPos.x + dx,
+            y: gameObjectPos.y + dy,
+        }
     }
 
     function collisionFilterIgnored(obj1, obj2) {
