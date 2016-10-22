@@ -43,6 +43,10 @@ define('game', [
         })
     }
 
+    function addGameObject(gameObject) {
+        spawnObjects.push(gameObject);
+    }
+
     class GameObject {
         constructor(pos) {
             this.pos = pos;
@@ -110,21 +114,18 @@ define('game', [
             super(pos);
             this.color = "white";
             this.hp = 9;
-            this.immune = 0;
             this.speed = 0.1;
             this.waypoints = waypoints;
             this.currentTarget = this.waypoints[0];
             this.collidedWithWaypoint(this.currentTarget);
         }
         hurt(obj) {
-            if (this.immune > 0) return;
-
             if (obj instanceof Punch) {
                 this.hp = this.hp - 5;
-                this.immune = 70;
+            } else if (obj instanceof Explosion) {
+                this.hp = this.hp - 10;
             } else {
-                this.hp = this.hp - 1;
-                this.immune = 70;
+                this.hp = this.hp - 3;
             }
             if (this.hp <= 0) this.markedForRemoval = true;
         }
@@ -134,11 +135,6 @@ define('game', [
             }
         }
         tick() {
-            if (this.immune >= 0) {
-                this.immune--;
-                return;
-            }
-
             const newPos = getNewPosition(this, this.currentTarget);
             attemptMove(this, newPos);
         }
@@ -148,11 +144,6 @@ define('game', [
             context.strokeRect(this.pos.x, this.pos.y, GRID_SIZE, GRID_SIZE);
             context.fillStyle = "black";
             context.fillText(this.hp.toFixed(0), this.pos.x + 3, this.pos.y + 18);
-
-            if (this.immune > 0) {
-                context.strokeStyle = "#4d4dff";
-                context.strokeRect(this.pos.x, this.pos.y, GRID_SIZE, GRID_SIZE);
-            }
         }
     }
 
@@ -161,21 +152,18 @@ define('game', [
             super(pos);
             this.color = "#ff243b";
             this.hp = 9;
-            this.immune = 0;
             this.speed = 0.1;
             this.waypoints = waypoints;
             this.currentTarget = this.waypoints[0];
             this.collidedWithWaypoint(this.currentTarget);
         }
         hurt(obj) {
-            if (this.immune > 0) return;
-
-            if (obj instanceof Shot || obj instanceof Mine) {
-                this.hp = this.hp - 5;
-                this.immune = 70;
+            if (obj instanceof Shot) {
+                this.hp = this.hp - 1;
+            } else if (obj instanceof Explosion) {
+                this.hp = this.hp - 10;
             } else {
-                this.hp = this.hp - 0.1;
-                this.immune = 70;
+                this.hp = this.hp - 1;
             }
             if (this.hp <= 0) this.markedForRemoval = true;
         }
@@ -185,11 +173,6 @@ define('game', [
             }
         }
         tick() {
-            if (this.immune >= 0) {
-                this.immune--;
-                return;
-            }
-
             const newPos = getNewPosition(this, this.currentTarget);
             attemptMove(this, newPos);
         }
@@ -197,11 +180,6 @@ define('game', [
             super.draw();
             context.fillStyle = "black";
             context.fillText(this.hp.toFixed(0), this.pos.x + 3, this.pos.y + 18);
-
-            if (this.immune > 0) {
-                context.strokeStyle = "#4d4dff";
-                context.strokeRect(this.pos.x, this.pos.y, GRID_SIZE, GRID_SIZE);
-            }
         }
     }
 
@@ -261,6 +239,12 @@ define('game', [
             super(pos);
             this.color = "#ed007d";
             this.duration = 10;
+            this.consumed = false;
+        }
+        dmg() {
+            var dmg = (this.consumed) ? 0 : 1;
+            this.consumed = true;
+            return dmg;
         }
         tick() {
             this.duration--;
@@ -275,6 +259,12 @@ define('game', [
             super(pos);
             this.color = "#6b0b00";
             this.duration = 10;
+            this.consumed = false;
+        }
+        dmg() {
+            var dmg = (this.consumed) ? 0 : 1;
+            this.consumed = true;
+            return dmg;
         }
         tick() {
             super.tick();
@@ -291,6 +281,12 @@ define('game', [
             super(pos);
             this.color = "#ffdf37";
             this.duration = 10;
+            this.consumed = false;
+        }
+        dmg() {
+            var dmg = (this.consumed) ? 0 : 1;
+            this.consumed = true;
+            return dmg;
         }
         tick() {
             super.tick();
@@ -307,23 +303,18 @@ define('game', [
             super(pos);
             this.color = "#19ed00";
             this.armTime = (FPS * 3) - 1; //Almost 3 seconds
-            this.detonationTime = Math.round(FPS * 0.6); // 0.6 seconds
             this.armDuration = this.armTime;
-            this.detonationCounter = 0;
+            this.isSensor = true;
+            this.consumed = false;
         }
         arming() {
             return (this.armDuration >= 0);
         }
-        triggered() {
-            return (this.detonationCounter > 0);
-        }
         trigger() {
-            if (this.triggered()) return;
-
-            if (!this.arming()) {
-                this.detonationCounter = this.detonationTime;
-            } else {
+            if (this.arming()) {
                 this.cleanUp();
+            } else {
+                this.detonate();
             }
         }
         detonate() {
@@ -332,26 +323,25 @@ define('game', [
                     var pos = _.clone(this.pos);
                     pos.x = pos.x + x;
                     pos.y = pos.y + y;
-                    gameObjects.push(new Explosion(pos));
+                    addGameObject(new Explosion(pos));
                 }.bind(this));
             }.bind(this));
             this.cleanUp();
         }
         cleanUp() {
             this.markedForRemoval = true;
-            var placementPos = {
-                x: this.pos.x,
-                y: this.pos.y
+            if (!this.consumed) {
+                this.consumed = true;
+                var placementPos = {
+                    x: this.pos.x,
+                    y: this.pos.y
+                }
+                addGameObject(new MineShell(placementPos));
             }
-            gameObjects.push(new MineShell(placementPos));
         }
         tick() {
             super.tick();
             if (this.arming()) this.armDuration--;
-            if (this.triggered()) this.detonationCounter--;
-
-            if (this.detonationCounter === 1) this.detonate();
-            attemptMove(this, this.pos);
         }
         draw() {
             if (this.arming()) {
@@ -359,16 +349,6 @@ define('game', [
                 context.strokeRect(this.pos.x, this.pos.y, GRID_SIZE, GRID_SIZE);
                 context.fillStyle = "black";
                 context.fillText(Math.floor((this.armDuration / FPS) + 1).toFixed(0), this.pos.x + 3, this.pos.y + 18);
-            } else if (this.triggered()) {
-                if (this.detonationCounter % 20 > 10) {
-                    context.fillStyle = "black";
-                    context.strokeStyle = "red";
-                } else {
-                    context.fillStyle = "red";
-                    context.strokeStyle = "black";
-                }
-                context.fillRect(this.pos.x, this.pos.y, GRID_SIZE, GRID_SIZE);
-                context.strokeRect(this.pos.x, this.pos.y, GRID_SIZE, GRID_SIZE);
             } else{
                 super.draw();
             }
@@ -379,6 +359,15 @@ define('game', [
         constructor(pos) {
             super(pos);
             this.color = "#005b13";
+            this.consumed = false;
+        }
+        consume() {
+            if (this.consumed) {
+                return 0;
+            } else {
+                this.consumed = true;
+                return 1;
+            }
         }
         draw() {
             context.strokeStyle = this.color;
@@ -405,7 +394,7 @@ define('game', [
                         var pos = _.clone(this.pos);
                         pos.x = pos.x + x;
                         pos.y = pos.y + y;
-                        gameObjects.push(new Shot(pos));
+                        addGameObject(new Shot(pos));
                     }.bind(this));
                 }.bind(this));
             }
@@ -500,7 +489,7 @@ define('game', [
                 var placementPos = _.clone(this.pos);
                 placementPos.x = placementPos.x + modifier.x;
                 placementPos.y = placementPos.y + modifier.y;
-                gameObjects.push(new Turret(placementPos));
+                addGameObject(new Turret(placementPos));
 
                 this.debree = this.debree - 1;
             }
@@ -537,7 +526,7 @@ define('game', [
                 var placementPos = _.clone(this.pos);
                 placementPos.x = placementPos.x + modifier.x;
                 placementPos.y = placementPos.y + modifier.y;
-                gameObjects.push(new Mine(placementPos));
+                addGameObject(new Mine(placementPos));
 
                 this.debree = this.debree - 1;
             }
@@ -591,11 +580,11 @@ define('game', [
                 var firstPos = _.clone(this.pos);
                 firstPos.x = firstPos.x + modifier1.x;
                 firstPos.y = firstPos.y + modifier1.y;
-                gameObjects.push(new Punch(firstPos));
+                addGameObject(new Punch(firstPos));
                 var secondPos = _.clone(this.pos);
                 secondPos.x = secondPos.x + modifier2.x;
                 secondPos.y = secondPos.y + modifier2.y;
-                gameObjects.push(new Punch(secondPos));
+                addGameObject(new Punch(secondPos));
             }
         }
         draw() {
@@ -643,7 +632,7 @@ define('game', [
                             waypoints.push(findGameObj(Mothership));
                             targetPos.x = (motherPos.x > targetPos.x) ? targetPos.x + GRID_SIZE : targetPos.x - GRID_SIZE;
                             targetPos.y = (motherPos.y > targetPos.y) ? targetPos.y + GRID_SIZE : targetPos.y - GRID_SIZE;
-                            gameObjects.push(new Flyer(targetPos, waypoints));
+                            addGameObject(new Flyer(targetPos, waypoints));
                         break;
                         case types.GRUNT:
                             var targetPos = _.clone(findGameObjWithIndex(Spawn, blueprint.spawnIdx).pos);
@@ -652,7 +641,7 @@ define('game', [
                             waypoints.push(findGameObj(Mothership));
                             targetPos.x = (motherPos.x > targetPos.x) ? targetPos.x + GRID_SIZE : targetPos.x - GRID_SIZE;
                             targetPos.y = (motherPos.y > targetPos.y) ? targetPos.y + GRID_SIZE : targetPos.y - GRID_SIZE;
-                            gameObjects.push(new Grunt(targetPos, waypoints));
+                            addGameObject(new Grunt(targetPos, waypoints));
                         break;
                     }
                 }
@@ -816,14 +805,30 @@ define('game', [
             mothership.parts = mothership.parts + 1;
         }
         // -------------------------------------------------------------------
+        if (typeCheck(obj1, obj2, Explosion, Grunt)) {
+            var grunt = (obj1 instanceof Grunt) ? obj1 : obj2;
+            var explosion = (obj1 instanceof Explosion) ? obj1 : obj2;
+            var dmg = explosion.dmg();
+            if (dmg) grunt.hurt(explosion);
+        }
+        if (typeCheck(obj1, obj2, Explosion, Player)) {
+            var player = (obj1 instanceof Player) ? obj1 : obj2;
+            player.disabled = true;
+        }
+
+        // -------------------------------------------------------------------
 
         if (typeCheck(obj1, obj2, Shot, Flyer)) {
             var flyer = (obj1 instanceof Flyer) ? obj1 : obj2;
-            flyer.hurt(Shot);
+            var shot = (obj1 instanceof Shot) ? obj1 : obj2;
+            var dmg = shot.dmg();
+            if (dmg) flyer.hurt(shot);
         }
         if (typeCheck(obj1, obj2, Shot, Grunt)) {
             var grunt = (obj1 instanceof Grunt) ? obj1 : obj2;
-            grunt.hurt(Shot);
+            var shot = (obj1 instanceof Shot) ? obj1 : obj2;
+            var dmg = shot.dmg();
+            if (dmg) grunt.hurt(shot);
         }
         if (typeCheck(obj1, obj2, Shot, Mothership)) {
             var mothership = (obj1 instanceof Mothership) ? obj1 : obj2;
@@ -848,18 +853,13 @@ define('game', [
         if (typeCheck(obj1, obj2, Player, Mine)) {
             var player = (obj1 instanceof Player) ? obj1 : obj2;
             var mine = (obj1 instanceof Mine) ? obj1 : obj2;
-            if (player.id === 1 && player.isHoldingPickButton) {
-                player.debree = player.debree + 1;
-                mine.markedForRemoval = true;
-            } else {
-                mine.trigger();
-            }
+            mine.trigger();
         }
         if (typeCheck(obj1, obj2, Player, MineShell)) {
             var player = (obj1 instanceof Player) ? obj1 : obj2;
             var mineshell = (obj1 instanceof MineShell) ? obj1 : obj2;
             if (player.id !== 1) return;
-            player.debree = player.debree + 1;
+            player.debree = player.debree + mineshell.consume();
             mineshell.markedForRemoval = true;
         }
         if (typeCheck(obj1, obj2, Player, Grunt)) {
@@ -881,11 +881,15 @@ define('game', [
 
         if (typeCheck(obj1, obj2, Punch, Flyer)) {
             var flyer = (obj1 instanceof Flyer) ? obj1 : obj2;
-            flyer.hurt(Punch);
+            var punch = (obj1 instanceof Punch) ? obj1 : obj2;
+            var dmg = punch.dmg();
+            if (dmg) flyer.hurt(punch);
         }
         if (typeCheck(obj1, obj2, Punch, Grunt)) {
             var grunt = (obj1 instanceof Grunt) ? obj1 : obj2;
-            grunt.hurt(Punch);
+            var punch = (obj1 instanceof Punch) ? obj1 : obj2;
+            var dmg = punch.dmg();
+            if (dmg) grunt.hurt(punch);
         }
         // -------------------------------------------------------------------
 
@@ -1075,8 +1079,8 @@ define('game', [
                 return !gameObject.remove();
             });
 
-            _.each(spawnObjects, function(spawnFunction) {
-                gameObjects.push(spawnFunction());
+            _.each(spawnObjects, function(object) {
+                gameObjects.push(object);
             });
             spawnObjects.length = 0;
 
