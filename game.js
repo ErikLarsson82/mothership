@@ -608,58 +608,37 @@ define('game', [
         }
         checkPunch(pad) {
             if (pad.buttons[5].pressed && this.cooldown <= 0) {
-                var modifier1 = { x: 0, y: 0 };
-                var modifier2 = { x: 0, y: 0 };
+                var modifier = { x: 0, y: 0 };
                 if (pad.axes[2] < -0.8) {
-                    modifier1 = {
-                        x: -GRID_SIZE,
-                        y: 0
-                    }
-                    modifier2 = {
+                    modifier = {
                         x: -GRID_SIZE*2,
                         y: 0
                     }
                 } else if (pad.axes[2] > 0.8) {
-                    modifier1 = {
-                        x: +GRID_SIZE,
-                        y: 0
-                    }
-                    modifier2 = {
+                    modifier = {
                         x: +GRID_SIZE*2,
                         y: 0
                     }
                 }
                 if (pad.axes[3] < -0.8) {
-                    modifier1 = {
-                        x: 0,
-                        y: -GRID_SIZE
-                    }
-                    modifier2 = {
+                    modifier = {
                         x: 0,
                         y: -GRID_SIZE*2
                     }
                 } else if (pad.axes[3] > 0.8) {
-                    modifier1 = {
-                        x: 0,
-                        y: +GRID_SIZE
-                    }
-                    modifier2 = {
+                    modifier = {
                         x: 0,
                         y: +GRID_SIZE*2
                     }
                 }
-                if (modifier1.x === 0 && modifier1.y === 0 && modifier2.x === 0 && modifier2.y === 0) return;
+                if (modifier.x === 0 && modifier.y === 0) return;
 
                 this.cooldown = 70;
 
-                var firstPos = _.clone(this.pos);
-                firstPos.x = firstPos.x + modifier1.x;
-                firstPos.y = firstPos.y + modifier1.y;
-                addGameObject(new Punch(firstPos));
-                var secondPos = _.clone(this.pos);
-                secondPos.x = secondPos.x + modifier2.x;
-                secondPos.y = secondPos.y + modifier2.y;
-                addGameObject(new Punch(secondPos));
+                var punchPos = _.clone(this.pos);
+                punchPos.x = punchPos.x + modifier.x;
+                punchPos.y = punchPos.y + modifier.y;
+                addGameObject(new Punch(punchPos));
             }
         }
         draw() {

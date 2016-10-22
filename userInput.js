@@ -1,6 +1,6 @@
 define('userInput', [], function() {
 
-    var DEBUG_USE_CONTROLLER = false;
+    var DEBUG_USE_CONTROLLER = true;
     var keyboardData = [
         {
             //Player 1
