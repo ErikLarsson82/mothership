@@ -52,7 +52,7 @@ define('game', [
             this.pos = pos;
             this.markedForRemoval = false;
             this.color = "#FFFF00";
-            this.isPhysical = true;
+            this.isSensor = false;
         }
         remove () {
             return this.markedForRemoval;
@@ -79,7 +79,7 @@ define('game', [
             super(pos);
             this.mapString = mapString;
             this.color = "#FFAAAA";
-            this.isPhysical = false;
+            this.isSensor = true;
         }
         draw() {
             if (DEBUG_DRAW_WAYPOINTS) {
@@ -702,7 +702,7 @@ define('game', [
         ]
         return !!_.find(table, function(filter) {
             return typeCheck(obj1, obj2, filter[0], filter[1]);
-        }) || !obj1.isPhysical || !obj2.isPhysical;
+        }) || obj1.isSensor || obj2.isSensor;
     }
 
     function collision(obj1, obj2) {
