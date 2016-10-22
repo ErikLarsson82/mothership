@@ -1,28 +1,51 @@
-define('map', [], function() {
-    var WALL = "Wall";
-    var PLAY = "Player";
-    var PLY1 = "Player1";
-    var PLY2 = "Player2";
-    var PLY3 = "Player3";
-    var DEBR = "Debree";
-    var MOTH = "Mothership";
-    var SPAW = "Spawn";
-    var SPW1 = "Spawn1";
-    var SPW2 = "Spawn2";
-    var SPW3 = "Spawn3";
-    var PART = "Part";
-    var ENEM = "Enemy";
-    var FLYE = "Flyer";
-    var GRUN = "Grunt";
-    var SHIE = "Shieldman";
-    var MINE = "Mine";
-    var PUNC = "Punch";
-    var TURRET = "Turret";
-    var SHOT = "Shot";
-    var MISH = "Mineshell";
-    var PAR1 = "Part1";
-    var PAR2 = "Part2";
-    var PAR3 = "Part3";
+define('map', ['types'], function(types) {
+    var WALL = types.WALL;
+    var PLY1 = {
+        type: types.PLAYER,
+        id: 0
+    };
+    var PLY2 = {
+        type: types.PLAYER,
+        id: 1
+    };
+    var PLY3 = {
+        type: types.PLAYER,
+        id: 2
+    };
+    var DEBR = types.DEBREE;
+    var MOTH = types.MOTHERSHIP;
+    var SPW1 = {
+        type: types.SPAWN,
+        id: 0
+    };
+    var SPW2 = {
+        type: types.SPAWN,
+        id: 1
+    };
+    var SPW3 = {
+        type: types.SPAWN,
+        id: 2
+    };
+    var FLYE = types.FLYER;
+    var GRUN = types.GRUNT;
+    var SHIE = types.SHIELDMAN;
+    var MINE = types.MINE;
+    var PUNC = types.PUNCH;
+    var TURR = types.TURRET;
+    var SHOT = types.SHOT;
+    var MISH = types.MINESHELL;
+    var PAR1 = {
+        type: types.PART,
+        id: 0
+    };
+    var PAR2 = {
+        type: types.PART,
+        id: 1
+    };
+    var PAR3 = {
+        type: types.PART,
+        id: 2
+    };
 
     // W    - Waypoint type
     // (a)  - Spawn point index
@@ -37,34 +60,7 @@ define('map', [], function() {
 
     var W3G0 = "W3G0";
     var W3G1 = "W3G1";
-
-    var types = { 
-        WALL: WALL,
-        PLAYER: PLAY,
-        PLAYER1: PLY1,
-        PLAYER2: PLY2,
-        PLAYER3: PLY3,
-        DEBREE: DEBR,
-        MOTHERSHIP: MOTH,
-        SPAWN: SPAW,
-        SPAWN1: SPW1,
-        SPAWN2: SPW2,
-        SPAWN3: SPW3,
-        PART: PART,
-        FLYER: FLYE,
-        GRUNT: GRUN,
-        SHIELDMAN: SHIE,
-        MINE: MINE,
-        PUNCH: PUNC,
-        TURR: TURRET,
-        SHOT: SHOT,
-        MINESHELL: MISH,
-        PART1: PAR1,
-        PART2: PAR2,
-        PART3: PAR3
-    };
     return {
-        types: types,
         map: [
             [WALL,WALL,WALL,WALL,WALL,WALL,WALL,WALL,WALL,WALL,WALL,WALL,WALL,WALL,WALL,WALL,WALL,WALL,WALL,WALL,WALL,WALL,WALL,WALL,WALL,WALL,WALL,WALL,WALL,WALL,WALL,WALL,WALL,WALL,WALL,WALL,WALL,WALL,WALL,WALL,WALL,WALL,WALL,WALL,WALL,WALL,WALL,WALL,WALL,WALL,WALL],
             [WALL,/**/,/**/,/**/,/**/,/**/,/**/,WALL,/**/,/**/,/**/,/**/,/**/,/**/,/**/,/**/,/**/,/**/,/**/,/**/,/**/,/**/,/**/,/**/,/**/,/**/,/**/,/**/,/**/,/**/,/**/,/**/,/**/,/**/,/**/,/**/,WALL,/**/,/**/,/**/,/**/,/**/,/**/,/**/,/**/,/**/,/**/,/**/,/**/,/**/,WALL],
@@ -113,7 +109,7 @@ define('map', [], function() {
             ]
         },
         waves: [
-            { duration: 10 },
+            { duration: 0 },
             { spawnIdx: 0, type: types.GRUNT },
             { duration: 10 },
             { spawnIdx: 2, type: types.FLYER },
