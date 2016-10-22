@@ -9,10 +9,6 @@ define('game', [
     map,
     types
 ) {
-    //Refactor:
-    // - Red ut "types" och index. Player med index 1,2,3 osv. Waves ska kunna peka ut SPAWN1 och inte bara ett index
-    // - Classer behöver TYPES som input, helt redundant
-
     // 144 or 60
     var DEBUG_WRITE_BUTTONS = false;
     var DEBUG_DRAW_WAYPOINTS = false;
@@ -290,12 +286,58 @@ define('game', [
         }
     }
 
+    class Explosion extends GameObject {
+        constructor(pos) {
+            super(pos);
+            this.color = "#ffdf37";
+            this.duration = 10;
+        }
+        tick() {
+            super.tick();
+            this.duration--;
+            if (this.duration <= 0) {
+                this.markedForRemoval = true;
+            }
+            attemptMove(this, this.pos);
+        }
+    }
+
     class Mine extends GameObject {
         constructor(pos) {
             super(pos);
             this.color = "#19ed00";
+            this.armTime = (FPS * 3) - 1; //Almost 3 seconds
+            this.detonationTime = Math.round(FPS * 0.6); // 0.6 seconds
+            this.armDuration = this.armTime;
+            this.detonationCounter = 0;
+        }
+        arming() {
+            return (this.armDuration >= 0);
+        }
+        triggered() {
+            return (this.detonationCounter > 0);
+        }
+        trigger() {
+            if (this.triggered()) return;
+
+            if (!this.arming()) {
+                this.detonationCounter = this.detonationTime;
+            } else {
+                this.cleanUp();
+            }
         }
         detonate() {
+            _.each([-GRID_SIZE*2,0,+GRID_SIZE*2], function(x) {
+                _.each([-GRID_SIZE*2,0,+GRID_SIZE*2], function(y) {
+                    var pos = _.clone(this.pos);
+                    pos.x = pos.x + x;
+                    pos.y = pos.y + y;
+                    gameObjects.push(new Explosion(pos));
+                }.bind(this));
+            }.bind(this));
+            this.cleanUp();
+        }
+        cleanUp() {
             this.markedForRemoval = true;
             var placementPos = {
                 x: this.pos.x,
@@ -305,7 +347,31 @@ define('game', [
         }
         tick() {
             super.tick();
+            if (this.arming()) this.armDuration--;
+            if (this.triggered()) this.detonationCounter--;
+
+            if (this.detonationCounter === 1) this.detonate();
             attemptMove(this, this.pos);
+        }
+        draw() {
+            if (this.arming()) {
+                context.strokeStyle = this.color;
+                context.strokeRect(this.pos.x, this.pos.y, GRID_SIZE, GRID_SIZE);
+                context.fillStyle = "black";
+                context.fillText(Math.floor((this.armDuration / FPS) + 1).toFixed(0), this.pos.x + 3, this.pos.y + 18);
+            } else if (this.triggered()) {
+                if (this.detonationCounter % 20 > 10) {
+                    context.fillStyle = "black";
+                    context.strokeStyle = "red";
+                } else {
+                    context.fillStyle = "red";
+                    context.strokeStyle = "black";
+                }
+                context.fillRect(this.pos.x, this.pos.y, GRID_SIZE, GRID_SIZE);
+                context.strokeRect(this.pos.x, this.pos.y, GRID_SIZE, GRID_SIZE);
+            } else{
+                super.draw();
+            }
         }
     }
 
@@ -786,8 +852,7 @@ define('game', [
                 player.debree = player.debree + 1;
                 mine.markedForRemoval = true;
             } else {
-                player.disabled = true;
-                mine.detonate();
+                mine.trigger();
             }
         }
         if (typeCheck(obj1, obj2, Player, MineShell)) {
@@ -836,8 +901,7 @@ define('game', [
         if (typeCheck(obj1, obj2, Grunt, Mine)) {
             var mine = (obj1 instanceof Mine) ? obj1 : obj2;
             var grunt = (obj1 instanceof Grunt) ? obj1 : obj2;
-            mine.detonate();
-            grunt.markedForRemoval = true;
+            mine.trigger();
         }
         if (typeCheck(obj1, obj2, Grunt, Mothership)) {
             var mothership = (obj1 instanceof Mothership) ? obj1 : obj2;
