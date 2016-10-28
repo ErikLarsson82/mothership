@@ -14,7 +14,8 @@ define('game', [
     var DEBUG_DRAW_WAYPOINTS = false;
     var DEBUG_DRAW_3D = false;
     var FULLSCREEN = false;
-    var DEBUG_EXPOSE_TO_WINDOW = false;
+    var DEBUG_EXPOSE_TO_WINDOW = true;
+    var DEBUG_DRAW_SCAN_AREAS = false;
 
     const FPS = 144;
     
@@ -110,35 +111,85 @@ define('game', [
             this.b = b;
             this.hp = 9;
             this.speed = 0.1;
-            this.isStunned = false;
-            this.stunnedCounter = 0;
+            this.stunnedTimer = 0;
+            this.lockedTimer = 0;
+            this.chaseTimer = 0;
+            this.playersInArea = false;
+            this.lockedPos = null;
+            this.chaseDirection = null;
+            this.scanAreaSize = GRID_SIZE * 5;
         }
         tick() {
-            if (this.isStunned) {
-                this.stunnedCounter--;
-                if (this.stunnedCounter <= 0) {
-                    this.isStunned = false;
-                }
+            if (this.stunnedTimer > 0) {
+                this.resolveStun();
+            } else if (this.chaseTimer > 0) {
+                this.chase();
+            } else if (this.lockedTimer > 0) {
+                this.lockTick();
             } else {
-                var motherPos = findGameObj(Mothership).pos;
-                var x = (motherPos.x > this.pos.x) ? this.pos.x + 0.1 : this.pos.x - 0.1;
-                var y = (motherPos.y > this.pos.y) ? this.pos.y + 0.1 : this.pos.y - 0.1;
-                let newPos = {
-                    x: x,
-                    y: y
-                }
-                attemptMove(this, newPos);
+                this.scanAndMoveToMothership();
             }
+        }
+        scanAndMoveToMothership() {
+            this.playersInArea = _.filter(scanArea(this.pos, this.scanAreaSize), function(obj) {
+                return (obj instanceof Player && !obj.disabled)
+            });
+            if (this.playersInArea.length > 0) {
+                this.lockedTimer = 200;
+                this.lockedPos = {
+                    x: this.playersInArea[0].pos.x,
+                    y: this.playersInArea[0].pos.y
+                }
+            }
+            var motherPos = findGameObj(Mothership).pos;
+            var x = (motherPos.x > this.pos.x) ? this.pos.x + 0.1 : this.pos.x - 0.1;
+            var y = (motherPos.y > this.pos.y) ? this.pos.y + 0.1 : this.pos.y - 0.1;
+            let newPos = {
+                x: x,
+                y: y
+            }
+            attemptMove(this, newPos);
+        }
+        lockTick() {
+            this.lockedTimer--;
+            if (this.lockedTimer <= 0) {
+                this.chaseTimer = 50;
+                this.chaseVector = {
+                    x: (this.pos.x > this.lockedPos.x) ? - 2 : 2,
+                    y: (this.pos.y > this.lockedPos.y) ? - 2 : 2
+                }
+            }
+            attemptMove(this, this.pos); //only to trigger collisions
+        }
+        chase() {
+            this.chaseTimer--;
+            var newPos = {
+                x: this.pos.x + this.chaseVector.x,
+                y: this.pos.y + this.chaseVector.y
+            }
+            attemptMove(this, newPos);
+        }
+        resolveStun() {
+            this.stunnedTimer--;
+            attemptMove(this, this.pos); //only to trigger collisions
+        }
+        resetTimersAndStun() {
+            this.stunnedTimer = 100;
+            this.chaseTimer = 0;
+            this.lockedTimer = 0;
         }
         hurt(punch) {
             if (punch.r === 1) {
                 this.r = 0;
+                this.resetTimersAndStun();
             }
             if (punch.g === 1) {
                 this.g = 0;
+                this.resetTimersAndStun();
             }
             if (punch.b === 1) {
                 this.b = 0;
+                this.resetTimersAndStun();
             }
             if (this.r === 0 && this.g === 0 && this.b === 0) {
                 this.markedForRemoval = true;
@@ -148,10 +199,29 @@ define('game', [
             var r = (this.r) ? "FF" : "00";
             var g = (this.g) ? "FF" : "00";
             var b = (this.b) ? "FF" : "00";
-            context.fillStyle = "#" + r + g + b;
+            if (this.lockedTimer % 50 > 25) {
+                context.fillStyle = "black";
+            } else if (this.stunnedTimer > 0) {
+                context.fillStyle = "gray";
+            } else {
+                context.fillStyle = "#" + r + g + b;
+            }
             context.fillRect(this.pos.x, this.pos.y, GRID_SIZE, GRID_SIZE);
             context.fillStyle = "black";
             context.fillText(this.hp.toFixed(0), this.pos.x + 3, this.pos.y + 18);
+
+            if (DEBUG_DRAW_SCAN_AREAS) {
+                context.globalAlpha = 0.2;
+                context.fillStyle = (this.playersInArea.length > 0) ? "red" : "gray";
+                context.fillRect(this.pos.x + GRID_SIZE / 2 - (this.scanAreaSize / 2), this.pos.y + GRID_SIZE / 2 - (this.scanAreaSize / 2), this.scanAreaSize, this.scanAreaSize);
+                context.globalAlpha = 1;
+                
+                if (this.lockedPos !== null) {
+                    context.fillStyle = "purple";
+                    context.fillRect(this.lockedPos.x, this.lockedPos.y, GRID_SIZE, GRID_SIZE);
+                }
+            }
+
         }
     }
 
@@ -436,7 +506,7 @@ define('game', [
         tick() {
             if (this.disabled) return;
             this.cooldown--;
-            var pad = userInput.readInput()[0];
+            var pad = userInput.readInput()[this.id];
             debugWriteButtons(pad);
             if (!(pad && pad.axes && pad.axes[2] !== null && pad.axes[3] !== null)) return;
 
@@ -793,7 +863,9 @@ define('game', [
         }
         if (typeCheck(obj1, obj2, Player, Chaser)) {
             var player = (obj1 instanceof Player) ? obj1 : obj2;
+            var chaser = (obj1 instanceof Chaser) ? obj1 : obj2;
             player.disabled = true;
+            chaser.resetTimersAndStun();
         }
         if (typeCheck(obj1, obj2, Player, MineShell)) {
             var player = (obj1 instanceof Player) ? obj1 : obj2;
@@ -834,6 +906,18 @@ define('game', [
             mine.trigger();
         }
         // -------------------------------------------------------------------
+    }
+
+    function scanArea(pos, size) {
+        size = size / 2;
+        var comparePos = {
+            x: pos.x + GRID_SIZE / 2,
+            y: pos.y + GRID_SIZE / 2
+        }
+        return _.filter(gameObjects, function(obj) {
+            return !((comparePos.x - size > obj.pos.x + GRID_SIZE) || (comparePos.x + size < obj.pos.x) ||
+                     (comparePos.y - size > obj.pos.y + GRID_SIZE) || (comparePos.y + size < obj.pos.y))
+        });
     }
 
     function attemptMove(gameObject, newPos) {
@@ -927,6 +1011,9 @@ define('game', [
 
     if (DEBUG_EXPOSE_TO_WINDOW) {
         window.gameObjects = gameObjects;
+        window.findGameObj = findGameObj;
+        window.findGameObjWithIndex = findGameObjWithIndex;
+        window.Player = Player;
     }
 
     return {
