@@ -13,13 +13,11 @@ define('game', [
     var DEBUG_WRITE_BUTTONS = false;
     var DEBUG_DRAW_WAYPOINTS = false;
     var DEBUG_DRAW_3D = false;
-    var FULLSCREEN = !false;
+    var FULLSCREEN = false;
     var DEBUG_EXPOSE_TO_WINDOW = false;
 
     const FPS = 144;
-    const WAYPOINT_REGEX = /W[0-9](G|F)[0-9]/g;
-    const MOVING_FROM_HIT_SMOOTHING = 0.9;
-
+    
     let gameObjects = [];
     let spawnObjects = [];
     let waveController = null;
@@ -60,7 +58,17 @@ define('game', [
         }
         tick() {}
         draw() {
-            context.fillStyle = this.color;
+            var allColorsExist = _.find([this.r, this.g, this.b], function(color) {
+                return typeof color === "number";
+            });
+            if (allColorsExist !== "undefined") {
+                var r = (this.r) ? "FF" : "00";
+                var g = (this.g) ? "FF" : "00";
+                var b = (this.b) ? "FF" : "00";
+                context.fillStyle = "#" + r + g + b;
+            } else {
+                context.fillStyle = this.color;
+            }
             context.fillRect(this.pos.x, this.pos.y, GRID_SIZE, GRID_SIZE);
         }
         draw3d() {
@@ -72,22 +80,6 @@ define('game', [
         constructor(pos) {
             super(pos);
             this.color = "black";
-        }
-    }
-
-    class Waypoint extends GameObject {
-        constructor(pos, mapString) {
-            super(pos);
-            this.mapString = mapString;
-            this.color = "#FFAAAA";
-            this.isSensor = true;
-        }
-        draw() {
-            if (DEBUG_DRAW_WAYPOINTS) {
-                super.draw();
-                context.fillStyle = "#FF00FF";
-                context.fillText(this.mapString, this.pos.x + 3, this.pos.y + 18);
-            }
         }
     }
 
@@ -110,142 +102,54 @@ define('game', [
         }
     }
 
-    class Flyer extends GameObject {
-        constructor(pos, waypoints) {
+    class Chaser extends GameObject {
+        constructor(pos, r, g, b) {
             super(pos);
-            this.color = "white";
+            this.r = r;
+            this.g = g;
+            this.b = b;
             this.hp = 9;
             this.speed = 0.1;
-            this.waypoints = waypoints;
-            this.currentTarget = this.waypoints[0];
-            this.collidedWithWaypoint(this.currentTarget);
-        }
-        hurt(obj, origin) {
-            if (obj instanceof Punch) {
-                this.hp = this.hp - 1;
-            } else if (obj instanceof Explosion) {
-                this.hp = this.hp - 10;
-            } else {
-                this.hp = this.hp - 3;
-            }
-            if (this.hp <= 0) this.markedForRemoval = true;
-
-            if (obj.strength && origin) {
-                const distance = getDistance(this.pos, origin);
-                this.hitStrength = obj.strength;
-                this.hitAngle = getAngle(this.pos, origin) + Math.PI;
-                this.hitMoveFrames = 15;
-                this.isMovingFromHit = true;
-            }
-        }
-        collidedWithWaypoint(waypoint) {
-            if (this.currentTarget === waypoint) {
-                this.currentTarget = this.waypoints.shift();
-            }
-        }
-        tick() {
-            let newPos;
-
-            if (this.isMovingFromHit) {
-                newPos = getNewPosition({
-                    pos: this.pos,
-                    speed: this.hitStrength,
-                }, {
-                    x: this.pos.x + Math.cos(this.hitAngle) * this.hitStrength,
-                    y: this.pos.y + Math.sin(this.hitAngle) * this.hitStrength,
-                });
-                this.isMovingFromHit = this.hitMoveFrames-- > 0;
-            } else {
-                const speed = this.speed;
-                const targetPos = this.currentTarget.pos;
-                newPos = getNewPosition({
-                    pos: this.pos,
-                    speed: speed,
-                }, targetPos);
-            }
-
-            attemptMove(this, newPos);
-        }
-        draw() {
-            super.draw();
-            context.strokeStyle = "#00f100";
-            context.strokeRect(this.pos.x, this.pos.y, GRID_SIZE, GRID_SIZE);
-            context.fillStyle = "black";
-            context.fillText(this.hp.toFixed(0), this.pos.x + 3, this.pos.y + 18);
-        }
-    }
-
-    class Grunt extends GameObject {
-        constructor(pos, waypoints) {
-            super(pos);
-            this.color = "#ff243b";
-            this.hp = 9;
-            this.speed = 0.1;
-            this.waypoints = waypoints;
-            this.currentTarget = this.waypoints[0];
-            this.collidedWithWaypoint(this.currentTarget);
             this.isStunned = false;
             this.stunnedCounter = 0;
         }
-        hurt(obj, origin) {
-            if (obj instanceof Shot) {
-                this.hp = this.hp - 2;
-                this.isStunned = true;
-                this.stunnedCounter = Math.round(FPS * 2);
-            } else if (obj instanceof Explosion) {
-                this.hp = this.hp - 10;
-            } else {
-                this.hp = this.hp - 1;
-            }
-            if (this.hp <= 0) this.markedForRemoval = true;
-
-            if (obj.strength && origin) {
-                const distance = getDistance(this.pos, origin);
-                this.hitStrength = obj.strength;
-                this.hitAngle = getAngle(this.pos, origin) + Math.PI;
-                this.hitMoveFrames = 15;
-                this.isMovingFromHit = true;
-            }
-        }
-        collidedWithWaypoint(waypoint) {
-            if (this.currentTarget === waypoint) {
-                this.currentTarget = this.waypoints.shift();
-            }
-        }
         tick() {
-            let newPos = {
-                x: this.pos.x,
-                y: this.pos.y
-            };
-
-            if (this.isMovingFromHit) {
-                this.hitStrength *= MOVING_FROM_HIT_SMOOTHING;
-                newPos = getNewPosition({
-                    pos: this.pos,
-                    speed: this.hitStrength,
-                }, {
-                    x: this.pos.x + Math.cos(this.hitAngle) * this.hitStrength,
-                    y: this.pos.y + Math.sin(this.hitAngle) * this.hitStrength,
-                });
-                this.isMovingFromHit = this.hitMoveFrames-- > 0;
-            } else if (this.isStunned) {
+            if (this.isStunned) {
                 this.stunnedCounter--;
                 if (this.stunnedCounter <= 0) {
                     this.isStunned = false;
                 }
             } else {
-                const speed = this.speed;
-                const targetPos = this.currentTarget.pos;
-                newPos = getNewPosition({
-                    pos: this.pos,
-                    speed: speed,
-                }, targetPos);
+                var motherPos = findGameObj(Mothership).pos;
+                var x = (motherPos.x > this.pos.x) ? this.pos.x + 0.1 : this.pos.x - 0.1;
+                var y = (motherPos.y > this.pos.y) ? this.pos.y + 0.1 : this.pos.y - 0.1;
+                let newPos = {
+                    x: x,
+                    y: y
+                }
+                attemptMove(this, newPos);
             }
-
-            attemptMove(this, newPos);
+        }
+        hurt(punch) {
+            if (punch.r === 1) {
+                this.r = 0;
+            }
+            if (punch.g === 1) {
+                this.g = 0;
+            }
+            if (punch.b === 1) {
+                this.b = 0;
+            }
+            if (this.r === 0 && this.g === 0 && this.b === 0) {
+                this.markedForRemoval = true;
+            }
         }
         draw() {
-            super.draw();
+            var r = (this.r) ? "FF" : "00";
+            var g = (this.g) ? "FF" : "00";
+            var b = (this.b) ? "FF" : "00";
+            context.fillStyle = "#" + r + g + b;
+            context.fillRect(this.pos.x, this.pos.y, GRID_SIZE, GRID_SIZE);
             context.fillStyle = "black";
             context.fillText(this.hp.toFixed(0), this.pos.x + 3, this.pos.y + 18);
         }
@@ -305,11 +209,13 @@ define('game', [
     class Punch extends GameObject {
         constructor(pos, player) {
             super(pos);
-            this.color = "#ed007d";
+            this.r = player.r;
+            this.g = player.g;
+            this.b = player.b;
+            this.color = "black";
             this.duration = 10;
             this.consumed = false;
             this.strength = 5;
-            this.origin = player.pos;
         }
         dmg() {
             var dmg = (this.consumed) ? 0 : 1;
@@ -518,7 +424,10 @@ define('game', [
         constructor(pos, id) {
             super(pos);
             this.id = id;
-            this.color = "purple";
+            this.r = (this.id === 0) ? 1 : 0;
+            this.g = (this.id === 1) ? 1 : 0;
+            this.b = (this.id === 2) ? 1 : 0;
+            this.color = "grey";
             this.debree = 1;
             this.disabled = false;
             this.cooldown = 0;
@@ -527,11 +436,11 @@ define('game', [
         tick() {
             if (this.disabled) return;
             this.cooldown--;
-            var pad = userInput.readInput()[this.id];
+            var pad = userInput.readInput()[0];
             debugWriteButtons(pad);
             if (!(pad && pad.axes && pad.axes[2] !== null && pad.axes[3] !== null)) return;
 
-            (this.id === 0 || this.id === 2) && this.checkPunch(pad);
+            this.checkPunch(pad); //(this.id === 0 || this.id === 2) && 
 
             (this.id === 1 || this.id === 0) && this.checkPlaceMine(pad);
 
@@ -657,10 +566,10 @@ define('game', [
             }
         }
         draw() {
-            context.fillStyle = this.color;
-            var outlines = ["#ed007d", "#19ed00", "#eb8d00"];
+            var outlines = ["#FF0000", "#00FF00", "#0000FF"];
             if (!this.disabled) {
-                super.draw();
+                context.fillStyle = "gray";
+                context.fillRect(this.pos.x, this.pos.y, GRID_SIZE, GRID_SIZE);
                 context.fillStyle = "white";
                 context.fillText(this.debree, this.pos.x + 3, this.pos.y + 18)
             }
@@ -676,15 +585,15 @@ define('game', [
     }
 
     class WaveController {
-        constructor(waves, waypointCollections) {
+        constructor(waves) {
             this.waves = waves || [];
             this.currentWave = null;
-            this.waypointCollections = waypointCollections;
         }
-        tick() {
+        tick(numberOfEnemiesOnScreen) {
             if (this.currentWave) {
                 this.currentWave.counter++;
-                if (this.currentWave.counter >= this.currentWave.duration) this.currentWave = null;
+                if (this.currentWave.counter >= this.currentWave.duration &&
+                    numberOfEnemiesOnScreen === 0) this.currentWave = null;
             } else {
                 var blueprint = this.waves.shift() || {};
                 if (blueprint.duration) {
@@ -694,23 +603,12 @@ define('game', [
                     }
                 } else if (blueprint.type) {
                     switch(blueprint.type) {
-                        case types.FLYER:
+                        case types.CHASER:
                             var targetPos = _.clone(findGameObjWithIndex(Spawn, blueprint.spawnIdx).pos);
                             var motherPos = findGameObj(Mothership).pos;
-                            var waypoints = _.clone(this.waypointCollections.flyerSpawns[blueprint.spawnIdx]);
-                            waypoints.push(findGameObj(Mothership));
                             targetPos.x = (motherPos.x > targetPos.x) ? targetPos.x + GRID_SIZE : targetPos.x - GRID_SIZE;
                             targetPos.y = (motherPos.y > targetPos.y) ? targetPos.y + GRID_SIZE : targetPos.y - GRID_SIZE;
-                            addGameObject(new Flyer(targetPos, waypoints));
-                        break;
-                        case types.GRUNT:
-                            var targetPos = _.clone(findGameObjWithIndex(Spawn, blueprint.spawnIdx).pos);
-                            var motherPos = findGameObj(Mothership).pos;
-                            var waypoints = _.clone(this.waypointCollections.gruntSpawns[blueprint.spawnIdx]);
-                            waypoints.push(findGameObj(Mothership));
-                            targetPos.x = (motherPos.x > targetPos.x) ? targetPos.x + GRID_SIZE : targetPos.x - GRID_SIZE;
-                            targetPos.y = (motherPos.y > targetPos.y) ? targetPos.y + GRID_SIZE : targetPos.y - GRID_SIZE;
-                            addGameObject(new Grunt(targetPos, waypoints));
+                            addGameObject(new Chaser(targetPos, blueprint.color[0], blueprint.color[1], blueprint.color[2]));
                         break;
                     }
                 }
@@ -808,24 +706,6 @@ define('game', [
         return (obj1 instanceof klass1 && obj2 instanceof klass2 || obj2 instanceof klass1 && obj1 instanceof klass2)
     }
 
-    function getNewPosition(physicsObject, targetPos) {
-        // physicsObject { pos: { x, y }, speed }
-        const physicsObjectPos = physicsObject.pos;
-        if (!targetPos) {
-            return {
-                x: physicsObjectPos.x,
-                y: physicsObjectPos.y,
-            }
-        }
-        const angle = getAngle(physicsObjectPos, targetPos);
-        const dx = Math.cos(angle) * physicsObject.speed;
-        const dy = Math.sin(angle) * physicsObject.speed;
-        return {
-            x: physicsObjectPos.x + dx,
-            y: physicsObjectPos.y + dy,
-        }
-    }
-
     function getAngle(pos1, pos2) {
         return Math.atan2(pos2.y - pos1.y, pos2.x - pos1.x);
     }
@@ -839,22 +719,16 @@ define('game', [
     function collisionFilterIgnored(obj1, obj2) {
         //Every pair here ignores collisions
         var table = [
-            [Flyer, Mine],
-            [Flyer, MineShell],
-            [Flyer, Grunt],
-            [Flyer, Turret],
-            [Flyer, Flyer],
-            [Flyer, Wall],
-            [Flyer, Debree],
-            [Flyer, Part],
-            [Part, Grunt],
+            [Chaser, Turret],
+            [Chaser, MineShell],
+            [Part, MineShell],
+            [Debree, MineShell],
+            [Player, Mine],
             [Part, Debree],
             [Part, Mine],
-            [Part, MineShell],
             [Part, Turret],
             [Part, Punch],
-            [Part, Shot],
-            [MineShell, Grunt]
+            [Part, Shot]
         ]
         return !!_.find(table, function(filter) {
             return typeCheck(obj1, obj2, filter[0], filter[1]);
@@ -862,20 +736,7 @@ define('game', [
     }
 
     function collision(obj1, obj2) {
-        if (typeCheck(obj1, obj2, Turret, Flyer)) {
-            var turret = (obj1 instanceof Turret) ? obj1 : obj2;
-            var flyer = (obj1 instanceof Flyer) ? obj1 : obj2;
-            if (!flyer.isMovingFromHit) {
-                turret.destroy();
-            }
-        }
-        if (typeCheck(obj1, obj2, Turret, Grunt)) {
-            var turret = (obj1 instanceof Turret) ? obj1 : obj2;
-            var grunt = (obj1 instanceof Grunt) ? obj1 : obj2;
-            if (!grunt.isMovingFromHit) {
-                turret.destroy();
-            }
-        }
+        
         if (typeCheck(obj1, obj2, Turret, Player)) {
             var turret = (obj1 instanceof Turret) ? obj1 : obj2;
             var player = (obj1 instanceof Player) ? obj1 : obj2;
@@ -895,17 +756,11 @@ define('game', [
             mothership.parts = mothership.parts + 1;
         }
         // -------------------------------------------------------------------
-        if (typeCheck(obj1, obj2, Explosion, Grunt)) {
-            var grunt = (obj1 instanceof Grunt) ? obj1 : obj2;
+        if (typeCheck(obj1, obj2, Explosion, Chaser)) {
+            var chaser = (obj1 instanceof Chaser) ? obj1 : obj2;
             var explosion = (obj1 instanceof Explosion) ? obj1 : obj2;
             var dmg = explosion.dmg();
-            if (dmg) grunt.hurt(explosion);
-        }
-        if (typeCheck(obj1, obj2, Explosion, Flyer)) {
-            var flyer = (obj1 instanceof Flyer) ? obj1 : obj2;
-            var explosion = (obj1 instanceof Explosion) ? obj1 : obj2;
-            var dmg = explosion.dmg();
-            if (dmg) flyer.hurt(explosion);
+            if (dmg) chaser.hurt(explosion);
         }
         if (typeCheck(obj1, obj2, Explosion, Player)) {
             var player = (obj1 instanceof Player) ? obj1 : obj2;
@@ -914,17 +769,11 @@ define('game', [
 
         // -------------------------------------------------------------------
 
-        if (typeCheck(obj1, obj2, Shot, Flyer)) {
-            var flyer = (obj1 instanceof Flyer) ? obj1 : obj2;
+        if (typeCheck(obj1, obj2, Shot, Chaser)) {
+            var chaser = (obj1 instanceof Chaser) ? obj1 : obj2;
             var shot = (obj1 instanceof Shot) ? obj1 : obj2;
             var dmg = shot.dmg();
-            if (dmg) flyer.hurt(shot, shot.origin);
-        }
-        if (typeCheck(obj1, obj2, Shot, Grunt)) {
-            var grunt = (obj1 instanceof Grunt) ? obj1 : obj2;
-            var shot = (obj1 instanceof Shot) ? obj1 : obj2;
-            var dmg = shot.dmg();
-            if (dmg) grunt.hurt(shot);
+            if (dmg) chaser.hurt(shot);
         }
         if (typeCheck(obj1, obj2, Shot, Mothership)) {
             var mothership = (obj1 instanceof Mothership) ? obj1 : obj2;
@@ -942,14 +791,9 @@ define('game', [
             var player = (obj1 instanceof Player) ? obj1 : obj2;
             player.disabled = true;
         }
-        if (typeCheck(obj1, obj2, Player, Flyer)) {
+        if (typeCheck(obj1, obj2, Player, Chaser)) {
             var player = (obj1 instanceof Player) ? obj1 : obj2;
             player.disabled = true;
-        }
-        if (typeCheck(obj1, obj2, Player, Mine)) {
-            var player = (obj1 instanceof Player) ? obj1 : obj2;
-            var mine = (obj1 instanceof Mine) ? obj1 : obj2;
-            mine.trigger();
         }
         if (typeCheck(obj1, obj2, Player, MineShell)) {
             var player = (obj1 instanceof Player) ? obj1 : obj2;
@@ -957,10 +801,6 @@ define('game', [
             if (player.id !== 0) return;
             player.debree = player.debree + mineshell.consume();
             mineshell.markedForRemoval = true;
-        }
-        if (typeCheck(obj1, obj2, Player, Grunt)) {
-            var player = (obj1 instanceof Player) ? obj1 : obj2;
-            player.disabled = true;
         }
         if (typeCheck(obj1, obj2, Player, Debree)) {
             var player = (obj1 instanceof Player) ? obj1 : obj2;
@@ -975,53 +815,25 @@ define('game', [
         // -------------------------------------------------------------------
 
 
-        if (typeCheck(obj1, obj2, Punch, Flyer)) {
-            var flyer = (obj1 instanceof Flyer) ? obj1 : obj2;
+        if (typeCheck(obj1, obj2, Punch, Chaser)) {
+            var chaser = (obj1 instanceof Chaser) ? obj1 : obj2;
             var punch = (obj1 instanceof Punch) ? obj1 : obj2;
             var dmg = punch.dmg();
-            if (dmg) flyer.hurt(punch, punch.origin);
-        }
-        if (typeCheck(obj1, obj2, Punch, Grunt)) {
-            var grunt = (obj1 instanceof Grunt) ? obj1 : obj2;
-            var punch = (obj1 instanceof Punch) ? obj1 : obj2;
-            var dmg = punch.dmg();
-            if (dmg) grunt.hurt(punch, punch.origin);
+            if (dmg) chaser.hurt(punch);
         }
         // -------------------------------------------------------------------
 
 
-        if (typeCheck(obj1, obj2, Flyer, Mothership)) {
+        if (typeCheck(obj1, obj2, Chaser, Mothership)) {
             var mothership = (obj1 instanceof Mothership) ? obj1 : obj2;
             mothership.hp = mothership.hp - 0.01;
             screenShaker.shake();
         }
-        // -------------------------------------------------------------------
-
-
-        if (typeCheck(obj1, obj2, Grunt, Mine)) {
+        if (typeCheck(obj1, obj2, Chaser, Mine)) {
             var mine = (obj1 instanceof Mine) ? obj1 : obj2;
-            var grunt = (obj1 instanceof Grunt) ? obj1 : obj2;
             mine.trigger();
         }
-        if (typeCheck(obj1, obj2, Grunt, Mothership)) {
-            var mothership = (obj1 instanceof Mothership) ? obj1 : obj2;
-            mothership.hp = mothership.hp - 0.03;
-            screenShaker.shake();
-        }
         // -------------------------------------------------------------------
-
-        // Waypoints
-        if (typeCheck(obj1, obj2, Grunt, Waypoint)) {
-            const grunt = (obj1 instanceof Grunt) ? obj1 : obj2;
-            const waypoint = (obj1 instanceof Waypoint) ? obj1 : obj2;
-            grunt.collidedWithWaypoint(waypoint)
-        }
-
-        if (typeCheck(obj1, obj2, Flyer, Waypoint)) {
-            const flyer = (obj1 instanceof Flyer) ? obj1 : obj2;
-            const waypoint = (obj1 instanceof Waypoint) ? obj1 : obj2;
-            flyer.collidedWithWaypoint(waypoint)
-        }
     }
 
     function attemptMove(gameObject, newPos) {
@@ -1068,10 +880,6 @@ define('game', [
                             gameObjects.push(new Mine({x: colIdx * GRID_SIZE, y: rowIdx * GRID_SIZE}));
                         break;
                     }
-                    // Waypoints
-                    if (item && item.match(WAYPOINT_REGEX)) {
-                        gameObjects.push(new Waypoint({x: colIdx * GRID_SIZE, y: rowIdx * GRID_SIZE}, item));
-                    }
                 } else {
                     //We found a item with both type and id, ie an {}
                     switch(item.type) {
@@ -1093,7 +901,7 @@ define('game', [
 
     function allEnemiesOnMap() {
         return _.filter(gameObjects, function(item) {
-            return item instanceof Flyer || item instanceof Grunt;
+            return item instanceof Chaser;
         });
     }
 
@@ -1109,7 +917,7 @@ define('game', [
         }
         if (
             findGameObjWithIndex(Player, 0).disabled &&
-            //findGameObjWithIndex(Player, 1).disabled &&
+            findGameObjWithIndex(Player, 1).disabled &&
             findGameObjWithIndex(Player, 2).disabled
         ) {
             return 2;
@@ -1124,19 +932,7 @@ define('game', [
     return {
         init: function() {
             generateMap();
-            const waypointCollections = {
-                gruntSpawns: map.waypointCollections.gruntSpawns.map(function (gruntSpawn) {
-                    return gruntSpawn.map(function (waypointName) {
-                        return findGameObjByMapString(waypointName);
-                    })
-                }),
-                flyerSpawns: map.waypointCollections.flyerSpawns.map(function (flyerSpawn) {
-                    return flyerSpawn.map(function (waypointName) {
-                        return findGameObjByMapString(waypointName);
-                    })
-                }),
-            };
-            waveController = new WaveController(map.waves, waypointCollections);
+            waveController = new WaveController(map.waves);
             screenShaker = new ScreenShaker();
 
             context.font="20px Verdana";
@@ -1165,7 +961,7 @@ define('game', [
                 }
             }
 
-            waveController.tick();
+            waveController.tick(allEnemiesOnMap().length);
 
             _.each(gameObjects, function(gameObject) {
                 gameObject.tick();
